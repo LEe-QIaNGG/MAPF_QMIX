@@ -1,6 +1,6 @@
-import gym
+import gymnasium as gym
 import numpy as np
-from gym import spaces
+from gymnasium import spaces
 
 class State():
     def __init__(self,num_agent,len_edge):
@@ -9,19 +9,19 @@ class State():
         self.step_len=1
 
         #起点，终点，障碍
-        self.map=generate_map() #3*len_edge*len_edge
+        self.map=self.generate_map() #3*len_edge*len_edge
 
-    def generate_map():
+    def generate_map(self):
         pass
 
     def move_agents(self,action,agent_id):
         #更新位置
         self.map[0]=self.map[0]############################################
 
-        N_finish,agent_id=eval_finish(agent_id)
+        N_finish,agent_id=self.eval_finish(agent_id)
 
         #观察空间为智能体自身位置，智能体终点位置，周围智能体位置，周围智能体终点位置，周围障碍
-        pos,goal,obs_pos,obs_goal,obs_obstacle=observe(self)
+        pos,goal,obs_pos,obs_goal,obs_obstacle=self.observe(self)
 
         return agent_id,[pos,goal,obs_pos,obs_goal,obs_obstacle]
     
@@ -40,15 +40,16 @@ class State():
 
     
 
-class MAPFEnv(gym.env):
+class MAPFEnv(gym.Env):
     def  __init__(self,num_agent,len_edge):
         self.num_agent=num_agent
         self.agent_id=range(self.num_agent)
+        self.len_edge=len_edge
         #动作空间简化为离散的36个方向，加上静止动作
         self.action_space=spaces.Tuple([spaces.Discrete(self.num_agent), spaces.Discrete(37)])
 
         #观察空间为智能体的二维位置，即2*N的nparray
-        self.observation_space=None
+        self.observation_space=spaces.Discrete(self.num_agent)########################
 
         #初始化地图
         self.state=State(self.num_agent,self.len_edge)
@@ -66,11 +67,10 @@ class MAPFEnv(gym.env):
 
 
     def eval(self,agent_id):
+        pass
 
 
-    
-    
-    def reset(self):
+    def reset(self,seed=None):
         return
     
     def render(self,mode='human'):
@@ -83,5 +83,5 @@ class MAPFEnv(gym.env):
 
 if __name__== "__main__":
     from stable_baselines3.common.env_checker import check_env 
-    env=MAPFEnv()
+    env=MAPFEnv(1,10)
     check_env(env)
