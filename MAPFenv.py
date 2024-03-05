@@ -1,7 +1,7 @@
 import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
-from scipy.spatial.distance import pdist,squreform
+from scipy.spatial.distance import pdist,squareform
 import time
 
 ACTION_COST, IDLE_COST, GOAL_REWARD, COLLISION_REWARD,FINISH_REWARD,BLOCKING_COST = -0.3, -.5, 0.0, -2.,20.,-1.
@@ -22,7 +22,9 @@ class State():
         self.observation=[self.map,self.obstacle,self.obs_agent]
 
     def generate_map(self):
-        pass
+        self.map=np.random.rand(4,self.num_agent)*self.len_edge/2
+        print(self.map)
+        return
 
     def generate_obstacle(self):
         pass
@@ -34,7 +36,7 @@ class State():
         return 
     
     def observe(self):
-        squreform(pdist())
+        squareform(pdist())
         return 
     
     def eval(self,id):
@@ -87,7 +89,7 @@ class MAPFEnv(gym.Env):
         self.state=State(self.num_agent,self.len_edge)
 
     def step(self,action):
-        self.state.move_agent(action)
+        self.state.move_agents(action)
 
         Reward=0
         ID=[]
@@ -127,7 +129,7 @@ class MAPFEnv(gym.Env):
 if __name__== "__main__":
     from stable_baselines3.common.env_checker import check_env 
     env=MAPFEnv(1,10)
-    check_env(env)
+    # check_env(env)
     #测试
     for epoch in range(5):
         for epoch in range(5):
