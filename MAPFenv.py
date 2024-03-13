@@ -49,13 +49,19 @@ class State():
 
         #所有智能体的二维位置
         pos=self.map[:,0:2]
+
         #得到N*N的曼哈顿距离矩阵
-        dist_mat=pdist(pos,'cityblock',out=None)
+        dist_mat=squareform(pdist(pos,'cityblock'))
 
-        print(np.where(dist_mat<OBSERVE_DIST,1,0))
+        #更新周围智能体索引矩阵
+        self.obs_agent=np.where(dist_mat<OBSERVE_DIST,1,0)
 
+        pos_agent_mat=self.obstacle
+        for i in agent_id:
+            dist_array=pdist(pos_agent_mat-pos[i],'cityblock')
+            self.obstacle_id[i]=np.where(dist_array<OBSERVE_DIST,1,0)
+        return
 
-        return 
     
     def eval(self,id):
         #计算id号智能体的reward，返回r和id，若id号智能体到达终点，返回-1
