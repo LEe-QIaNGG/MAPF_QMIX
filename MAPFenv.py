@@ -4,15 +4,16 @@ from gymnasium import spaces
 from scipy.spatial.distance import pdist,squareform
 import time
 
+#奖励的参数
 ACTION_COST, IDLE_COST, GOAL_REWARD, COLLISION_REWARD,FINISH_REWARD,BLOCKING_COST = -0.3, -.5, 0.0, -2.,20.,-1.
-COLLID_E,OBSERVE_DIST=0.1,2
+#碰撞的判定距离，智能体的视野距离,智能体的步长
+COLLID_E,OBSERVE_DIST,STEP_LEN=0.1,2,0.8
 
 class State():
     def __init__(self,num_agent,len_edge):
         self.num_agent=num_agent
         self.num_obstacle=2
         self.len_edge=len_edge
-        self.step_len=1
 
         #起点，终点，障碍
         self.map=self.generate_map() #4*num_agent
@@ -39,7 +40,7 @@ class State():
         Action=np.array(action)
         x_change=np.cos(Action.take([agent_id])*np.pi/36).reshape(-1,1)
         y_cahnge=np.sin(Action.take([agent_id])*np.pi/36).reshape(-1,1)
-        change=np.stack([x_change,y_cahnge]).reshape(-1,2)
+        change=STEP_LEN*np.stack([x_change,y_cahnge]).reshape(-1,2)
         self.map[agent_id,0:2]=self.map[agent_id,0:2]+change
         self.observation=np.concatenate((self.map,self.obstacle_id.reshape(self.num_agent,-1),self.obs_agent.reshape(self.num_agent,-1)),axis=1)
         return 
@@ -73,6 +74,7 @@ class State():
         return reward,id
 
     def collide(self,id):
+        #返回id号智能体碰撞奖励
         #id号智能体当前二维位置
         pos=self.observation[id,0:2]
 
@@ -131,7 +133,6 @@ class MAPFEnv(gym.Env):
         self.state=State(self.num_agent,self.len_edge)
 
     def step(self,action):
-        # print('action: ',action)
         self.state.move_agents(action,self.agent_id)
 
         Reward=0
