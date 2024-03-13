@@ -1,11 +1,11 @@
 import DQN
-import MAPFenv
+import Env
 
 MEMORY_CAPACITY = 2000  #经验回放池大小
 
 def DQN_Training():
-    dqn=DQN()
-    env=MAPFenv(3,10)
+    dqn= DQN.DQNet(MEMORY_CAPACITY)
+    env=Env.MAPFEnv()
 
     print("\nCollecting experience...")
     for i_episode in range(400):
@@ -15,7 +15,7 @@ def DQN_Training():
         while True:
             env.render()
             
-            a = dqn.choose_action(s)
+            a = dqn.choose_action(s,env)
             s_, r, done, info = env.step(a)
             
             # # modify the reward based on the environment state

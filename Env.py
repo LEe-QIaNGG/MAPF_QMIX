@@ -8,7 +8,10 @@ import time
 ACTION_COST, IDLE_COST, GOAL_REWARD, COLLISION_REWARD,FINISH_REWARD,BLOCKING_COST = -0.3, -.5, 0.0, -2.,20.,-1.
 #碰撞的判定距离，智能体的视野距离,智能体的步长
 COLLID_E,OBSERVE_DIST,STEP_LEN=0.1,2,0.8
-NUM_OBSTACLE=3
+NUM_OBSTACLE,NUM_AGENTS=3,3 #障碍物个数
+MAP_WIDTH=10 #地图为正方形
+NUM_DIRECTIONS=8
+
 
 class State():
     def __init__(self,num_agent,len_edge):
@@ -39,8 +42,8 @@ class State():
     def move_agents(self,action,agent_id):
         #更新位置
         Action=np.array(action)
-        x_change=np.cos(Action.take([agent_id])*np.pi/36).reshape(-1,1)
-        y_cahnge=np.sin(Action.take([agent_id])*np.pi/36).reshape(-1,1)
+        x_change=np.cos(Action.take([agent_id])*np.pi/NUM_DIRECTIONS).reshape(-1,1)
+        y_cahnge=np.sin(Action.take([agent_id])*np.pi/NUM_DIRECTIONS).reshape(-1,1)
         change=STEP_LEN*np.stack([x_change,y_cahnge]).reshape(-1,2)
         self.map[agent_id,0:2]=self.map[agent_id,0:2]+change
         self.observation=np.concatenate((self.map,self.obstacle_id.reshape(self.num_agent,-1),self.obs_agent.reshape(self.num_agent,-1)),axis=1)
@@ -126,12 +129,12 @@ class State():
 
 
 class MAPFEnv(gym.Env):
-    def  __init__(self,num_agent,len_edge):
-        self.num_agent=num_agent
+    def  __init__(self):
+        self.num_agent=NUM_AGENTS
         self.agent_id=list(range(self.num_agent))
-        self.len_edge=len_edge
+        self.len_edge=MAP_WIDTH
         #动作空间简化为离散的36个方向
-        self.action_space=spaces.Box(low=0,high=36,shape=(1,self.num_agent),dtype=np.int64)
+        self.action_space=spaces.Box(low=0,high=NUM_DIRECTIONS,shape=(1,self.num_agent),dtype=np.int64)
         # self.action_space = spaces.Tuple([spaces.Discrete(self.num_agent), spaces.Discrete(36)])
 
         #观察空间为智能体的二维位置，即2*N的nparray
@@ -182,7 +185,7 @@ class MAPFEnv(gym.Env):
 
 if __name__== "__main__":
     from stable_baselines3.common.env_checker import check_env 
-    env=MAPFEnv(3,10)
+    env=MAPFEnv()
     # print(env.action_space.sample())
     # # check_env(env)
     #测试

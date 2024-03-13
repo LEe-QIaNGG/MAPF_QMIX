@@ -3,28 +3,26 @@ import torch.nn as nn
 from torch.autograd import Variable
 import torch.nn.functional as F
 import numpy as np
-import MAPFenv
+from Env import NUM_OBSTACLE,NUM_AGENTS,NUM_DIRECTIONS
 
 BATCH_SIZE = 32     #从缓冲区采样过程的批大小
 LR = 0.01           #学习率
-EPSILON = 0.9       #epsilon greedy方法
+EPSILON = 0.99       #epsilon greedy方法
 GAMMA = 0.9         #衰减因子
 TARGET_NETWORK_REPLACE_FREQ = 100       #目标网络更新的频率
-
-# env=MAPFenv(3,10)
-# N_ACTIONS = env.action_space.n  # 2 actions
-# N_STATES = env.observation_space.shape[0] # 4 states
+N_STATES = NUM_AGENTS*(4+NUM_OBSTACLE+NUM_AGENTS)
+N_ACTIONS=NUM_DIRECTIONS**NUM_AGENTS
 
 
 #目标网和训练网使用的网络
 class Net(nn.Module):
     def __init__(self):
-        #全连接网络
+        #全连接网络，接受状态，输出动作空间中所有动作对应的Q值
         super(Net, self).__init__()
         #网络结构
-        self.fc1 = nn.Linear(N_STATES, 10)  # layer 1
+        self.fc1 = nn.Linear(N_STATES, 50)  # layer 1
         self.fc1.weight.data.normal_(0, 0.1) #初始化
-        self.out = nn.Linear(10, N_ACTIONS) # layer 2
+        self.out = nn.Linear(50, N_ACTIONS) # layer 2
         self.out.weight.data.normal_(0, 0.1) 
         
         
@@ -37,7 +35,7 @@ class Net(nn.Module):
 
 
 
-class DQN(object):
+class DQNet(object):
     def __init__(self,MEMORY_CAPACITY):
         self.MEMORY_CAPACITY=MEMORY_CAPACITY
         # 目标网络和训练网络
@@ -54,7 +52,7 @@ class DQN(object):
         self.loss_func = nn.MSELoss()
 
     def  choose_action(self, x,env):
-        #实现epsilon greedy方法
+        #实现epsilon greedy方法，接受当前状态，环境，返回动作
         
         x = torch.unsqueeze(torch.FloatTensor(x), 0) #为输入状态x增加一个维度
 
@@ -62,11 +60,11 @@ class DQN(object):
         if np.random.uniform() < EPSILON:   # 贪心
             
             actions_value = self.eval_net.forward(x)
-            #print(torch.max(actions_value, 1)) 
+            print(torch.max(actions_value, 1))
             # torch.max() returns a tensor composed of max value along the axis=dim and corresponding index
             # what we need is the index in this function, representing the action of cart.
-            action = torch.max(actions_value, 1)[1].data.numpy()
-            action = action[0] if ENV_A_SHAPE == 0 else action.reshape(ENV_A_SHAPE)  # return the argmax index
+            action = torch.max(actions_value, 1)[1].detach().numpy()
+
         else:   #随机
             # action = np.random.randint(0, N_ACTIONS)
             # action = action if ENV_A_SHAPE == 0 else action.reshape(ENV_A_SHAPE)
