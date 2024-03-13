@@ -8,11 +8,12 @@ import time
 ACTION_COST, IDLE_COST, GOAL_REWARD, COLLISION_REWARD,FINISH_REWARD,BLOCKING_COST = -0.3, -.5, 0.0, -2.,20.,-1.
 #碰撞的判定距离，智能体的视野距离,智能体的步长
 COLLID_E,OBSERVE_DIST,STEP_LEN=0.1,2,0.8
+NUM_OBSTACLE=3
 
 class State():
     def __init__(self,num_agent,len_edge):
         self.num_agent=num_agent
-        self.num_obstacle=2
+        self.num_obstacle=NUM_OBSTACLE
         self.len_edge=len_edge
 
         #起点，终点，障碍
@@ -56,9 +57,11 @@ class State():
 
         #更新周围智能体索引矩阵
         self.obs_agent=np.where(dist_mat<OBSERVE_DIST,1,0)
+        np.fill_diagonal(self.obs_agent, 0)
 
         pos_agent_mat=self.obstacle
         for i in agent_id:
+            x=pos_agent_mat-pos[i]
             dist_array=pdist(pos_agent_mat-pos[i],'cityblock')
             self.obstacle_id[i]=np.where(dist_array<OBSERVE_DIST,1,0)
         return
@@ -92,9 +95,9 @@ class State():
         return r
     
     def finish(self,id):
-        now=self.map[id,0:1]
-        goal=now=self.map[id,2:3]
-        if now==goal:
+        now=self.map[id,0:2]
+        goal=self.map[id,2:4]
+        if (now==goal).all():
             return True
         else:
             return False
@@ -112,6 +115,11 @@ class State():
         #mat为m*2的矩阵
         dist=np.linalg.norm(mat,ord=2,axis=1)
         return np.sum(dist<e)
+
+    def get_remaining_dist(self):
+        #各智能体位置与终点坐标差
+        mat=self.map[:,0:2]-self.map[:,2:4]
+        return sum(np.linalg.norm(mat,ord=2,axis=1))
 
 
     
@@ -143,7 +151,6 @@ class MAPFEnv(gym.Env):
             Reward=Reward+r
             if id!=-1:
                 ID.append(id)
-        print('Reward:',Reward)
         #更新还在移动的智能体编号
         self.agent_id=ID
         observation=self.state.observe(self.agent_id)
@@ -182,13 +189,13 @@ if __name__== "__main__":
     for epoch in range(5):
         for epoch in range(5):
             env.reset()
-            print('Epoch', epoch+1, ': ',end='')
-            print(env.state, end='')
+            print('Epoch', epoch+1, ': ',end='\n')
+            print('remaining distance:',env.state.get_remaining_dist(), end='')
             env.render()    # 刷新画面
             time.sleep(0.5)
             for i in range(5):
-                env.step(env.action_space.sample())     # 随机选择一个动作执行
-                print(' -> ', env.state, end='')
+                _,r,_,_=env.step(env.action_space.sample())     # 随机选择一个动作执行
+                print('remaining distance:', env.state.get_remaining_dist(),' Reward:',r, end='\n')
                 env.render()    # 刷新画面
                 time.sleep(0.5)
         print()
