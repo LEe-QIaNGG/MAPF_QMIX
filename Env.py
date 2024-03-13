@@ -134,7 +134,7 @@ class MAPFEnv(gym.Env):
         self.agent_id=list(range(self.num_agent))
         self.len_edge=MAP_WIDTH
         #动作空间简化为离散的36个方向
-        self.action_space=spaces.Box(low=0,high=NUM_DIRECTIONS,shape=(1,self.num_agent),dtype=np.int64)
+        self.action_space=spaces.Box(low=0,high=NUM_DIRECTIONS-1,shape=(1,self.num_agent),dtype=np.int64)
         # self.action_space = spaces.Tuple([spaces.Discrete(self.num_agent), spaces.Discrete(36)])
 
         #观察空间为智能体的二维位置，即2*N的nparray

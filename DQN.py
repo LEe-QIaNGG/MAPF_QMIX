@@ -27,7 +27,7 @@ class Net(nn.Module):
         
         
     def forward(self, x):
-        x = self.fc1(x)
+        x = self.fc1(x.reshape(-1,N_STATES))
         x = F.relu(x)
         actions_value = self.out(x)
         return actions_value
