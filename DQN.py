@@ -7,7 +7,7 @@ from Env import NUM_OBSTACLE,NUM_AGENTS,NUM_DIRECTIONS
 
 BATCH_SIZE = 32     #从缓冲区采样过程的批大小
 LR = 0.01           #学习率
-EPSILON = 0.99       #epsilon greedy方法
+EPSILON = 0.01       #epsilon greedy方法
 GAMMA = 0.9         #衰减因子
 TARGET_NETWORK_REPLACE_FREQ = 100       #目标网络更新的频率
 N_STATES = NUM_AGENTS*(4+NUM_OBSTACLE+NUM_AGENTS)
@@ -45,7 +45,7 @@ class DQNet(object):
         self.memory_counter = 0 #经验回放计数器
         
         #经验回放池 （s, a, r, s_）
-        self.memory = np.zeros((MEMORY_CAPACITY, N_STATES * 2 + 2)) 
+        self.memory = np.zeros((MEMORY_CAPACITY, N_STATES * 2 + 3)) #r:1*1 a:1*2
         
         self.optimizer = torch.optim.Adam(self.eval_net.parameters(), lr=LR)
         
@@ -58,23 +58,20 @@ class DQNet(object):
 
         #只输入一个样本
         if np.random.uniform() < EPSILON:   # 贪心
-            
+            #动作空间中每个动作的Q值，选最大
             actions_value = self.eval_net.forward(x)
-            print(torch.max(actions_value, 1))
-            # torch.max() returns a tensor composed of max value along the axis=dim and corresponding index
-            # what we need is the index in this function, representing the action of cart.
             Index = torch.max(actions_value, 1)[1].detach().numpy()
-            action=np.array([int(Index/NUM_DIRECTIONS),int(Index%NUM_DIRECTIONS)])
+            #动作空间的序号转动作向量
+            action=tuple([int(Index/NUM_DIRECTIONS),int(Index%NUM_DIRECTIONS)])
         else:   #随机
-            # action = np.random.randint(0, N_ACTIONS)
-            # action = action if ENV_A_SHAPE == 0 else action.reshape(ENV_A_SHAPE)
             action=env.action_space.sample()
         return action
     
         
     def store_transition(self, s, a, r, s_):
-        #存储经验     
-        transition = np.hstack((s, [a, r], s_)) #水平叠加这些矢向量
+        #存储经验
+
+        transition = np.concatenate([s.reshape(1,-1), np.array(a).reshape(1,-1),np.array(r).reshape(1,-1), s_.reshape(1,-1)],axis=1) #水平叠加这些矢向量
         #如果容量已满，则使用index将旧内存替换为新内存
         index = self.memory_counter % self.MEMORY_CAPACITY
         self.memory[index, :] = transition

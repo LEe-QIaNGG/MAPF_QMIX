@@ -160,12 +160,12 @@ class MAPFEnv(gym.Env):
             else:
                 #没有到达终点的话，更新智能体周围智能体和障碍信息
                 observation=self.state.observe(action[0])
-            
         else:
             #该智能体已到终点，无需做动作
             Reward=GOAL_REWARD
         
         info={}
+        observation=self.state.observation
 
         if self.agent_id==[]:
             Reward=Reward+FINISH_REWARD
