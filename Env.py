@@ -39,18 +39,22 @@ class State():
         self.obstacle=np.random.rand(self.num_obstacle,2)*self.len_edge/2
         return self.obstacle
 
-    def move_agents(self,action,agent_id):
+    def move_agents(self,action):
         #更新位置
-        Action=np.array(action)
-        x_change=np.cos(Action.take([agent_id])*np.pi/NUM_DIRECTIONS).reshape(-1,1)
-        y_cahnge=np.sin(Action.take([agent_id])*np.pi/NUM_DIRECTIONS).reshape(-1,1)
-        change=STEP_LEN*np.stack([x_change,y_cahnge]).reshape(-1,2)
-        self.map[agent_id,0:2]=self.map[agent_id,0:2]+change
-        self.observation=np.concatenate((self.map,self.obstacle_id.reshape(self.num_agent,-1),self.obs_agent.reshape(self.num_agent,-1)),axis=1)
+        # Action=np.array(action)
+        # x_change=np.cos(Action.take([agent_id])*np.pi/NUM_DIRECTIONS).reshape(-1,1)
+        # y_cahnge=np.sin(Action.take([agent_id])*np.pi/NUM_DIRECTIONS).reshape(-1,1)
+        # change=STEP_LEN*np.stack([x_change,y_cahnge]).reshape(-1,2)
+        # self.map[agent_id,0:2]=self.map[agent_id,0:2]+change
+        # self.observation=np.concatenate((self.map,self.obstacle_id.reshape(self.num_agent,-1),self.obs_agent.reshape(self.num_agent,-1)),axis=1)
+        
+        pos=self.map[action[0],0:2]  #当前智能体的二维坐标
+        change=STEP_LEN*np.stack([np.cos(action[1]*np.pi/NUM_DIRECTIONS),np.sin(action[1]*np.pi/NUM_DIRECTIONS)]).reshape(-1,2)
+        self.map[action[0],0:2]=pos+change
         return 
     
-    def observe(self,agent_id):
-        #通过简略计算更新活动智能体周围智能体和障碍编号
+    def observe(self,id):
+        #通过简略计算更新id智能体周围智能体和障碍编号
 
         #所有智能体的二维位置
         pos=self.map[:,0:2]
@@ -62,11 +66,11 @@ class State():
         self.obs_agent=np.where(dist_mat<OBSERVE_DIST,1,0)
         np.fill_diagonal(self.obs_agent, 0)
 
+        #更新障碍索引
         pos_agent_mat=self.obstacle
-        for i in agent_id:
-            x=pos_agent_mat-pos[i]
-            dist_array=pdist(pos_agent_mat-pos[i],'cityblock')
-            self.obstacle_id[i]=np.where(dist_array<OBSERVE_DIST,1,0)
+        x=pos_agent_mat-pos[id]
+        dist_array=pdist(pos_agent_mat-pos[id],'cityblock')
+        self.obstacle_id[id]=np.where(dist_array<OBSERVE_DIST,1,0)
         return
 
     
@@ -75,7 +79,7 @@ class State():
         reward=0
         reward=reward+self.collide(id)
         if self.finish(id):
-            reward=reward+FINISH_REWARD
+            reward=reward+GOAL_REWARD
             id=-1
         return reward,id
 
@@ -133,9 +137,10 @@ class MAPFEnv(gym.Env):
         self.num_agent=NUM_AGENTS
         self.agent_id=list(range(self.num_agent))
         self.len_edge=MAP_WIDTH
-        #动作空间简化为离散的36个方向
-        self.action_space=spaces.Box(low=0,high=NUM_DIRECTIONS-1,shape=(1,self.num_agent),dtype=np.int64)
-        # self.action_space = spaces.Tuple([spaces.Discrete(self.num_agent), spaces.Discrete(36)])
+
+        #动作空间简化为离散的N个方向，每次只有一个智能体移动
+        # self.action_space=spaces.Box(low=0,high=NUM_DIRECTIONS-1,shape=(1,self.num_agent),dtype=np.int64)
+        self.action_space = spaces.Tuple([spaces.Discrete(self.num_agent), spaces.Discrete(NUM_DIRECTIONS)])
 
         #观察空间为智能体的二维位置，即2*N的nparray
         # self.observation_space=spaces.Discrete(self.num_agent)
@@ -144,27 +149,29 @@ class MAPFEnv(gym.Env):
         self.state=State(self.num_agent,self.len_edge)
 
     def step(self,action):
-        self.state.move_agents(action,self.agent_id)
-
-        Reward=0
-        ID=[]
+        #接受动作，返回状态，奖励，done，info，action为(agent_id,direction)
+        if action[0] in self.agent_id:
+            self.state.move_agents(action)
+            #获取奖励，判断是否到终点
+            Reward,id=self.state.eval(action[0])
+            if id==-1:
+                #智能体到达终点，活动智能体索引中删除该编号
+                self.agent_id.remove(action[0])
+            else:
+                #没有到达终点的话，更新智能体周围智能体和障碍信息
+                observation=self.state.observe(action[0])
+            
+        else:
+            #该智能体已到终点，无需做动作
+            Reward=GOAL_REWARD
         
-        for i in self.agent_id:
-            r,id=self.state.eval(i)
-            Reward=Reward+r
-            if id!=-1:
-                ID.append(id)
-        #更新还在移动的智能体编号
-        self.agent_id=ID
-        observation=self.state.observe(self.agent_id)
-
         info={}
 
         if self.agent_id==[]:
+            Reward=Reward+FINISH_REWARD
             return observation,Reward,True,info
 
         return observation,Reward,False,info
-    
 
 
 

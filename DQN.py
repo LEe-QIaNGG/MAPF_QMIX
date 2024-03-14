@@ -11,7 +11,7 @@ EPSILON = 0.99       #epsilon greedy方法
 GAMMA = 0.9         #衰减因子
 TARGET_NETWORK_REPLACE_FREQ = 100       #目标网络更新的频率
 N_STATES = NUM_AGENTS*(4+NUM_OBSTACLE+NUM_AGENTS)
-N_ACTIONS=NUM_DIRECTIONS**NUM_AGENTS
+N_ACTIONS=NUM_DIRECTIONS*NUM_AGENTS
 
 
 #目标网和训练网使用的网络
@@ -20,9 +20,9 @@ class Net(nn.Module):
         #全连接网络，接受状态，输出动作空间中所有动作对应的Q值
         super(Net, self).__init__()
         #网络结构
-        self.fc1 = nn.Linear(N_STATES, 50)  # layer 1
+        self.fc1 = nn.Linear(N_STATES, 10)  # layer 1
         self.fc1.weight.data.normal_(0, 0.1) #初始化
-        self.out = nn.Linear(50, N_ACTIONS) # layer 2
+        self.out = nn.Linear(10, N_ACTIONS) # layer 2
         self.out.weight.data.normal_(0, 0.1) 
         
         
@@ -63,8 +63,8 @@ class DQNet(object):
             print(torch.max(actions_value, 1))
             # torch.max() returns a tensor composed of max value along the axis=dim and corresponding index
             # what we need is the index in this function, representing the action of cart.
-            action = torch.max(actions_value, 1)[1].detach().numpy()
-
+            Index = torch.max(actions_value, 1)[1].detach().numpy()
+            action=np.array([int(Index/NUM_DIRECTIONS),int(Index%NUM_DIRECTIONS)])
         else:   #随机
             # action = np.random.randint(0, N_ACTIONS)
             # action = action if ENV_A_SHAPE == 0 else action.reshape(ENV_A_SHAPE)
