@@ -5,9 +5,9 @@ from scipy.spatial.distance import pdist,squareform
 import time
 
 #奖励的参数
-ACTION_COST, IDLE_COST, GOAL_REWARD, COLLISION_REWARD,FINISH_REWARD,BLOCKING_COST = -0.3, -.5, 0.0, -2.,20.,-1.
+ACTION_COST, GOAL_REWARD, COLLISION_REWARD,FINISH_REWARD,AWAY_COST = -0.3, 0.0, -2.,20.,-1
 #碰撞的判定距离，智能体的视野距离,智能体的步长
-COLLID_E,OBSERVE_DIST,STEP_LEN=0.1,2,0.8
+COLLID_E,OBSERVE_DIST,STEP_LEN,GOAL_E=0.3,2,0.1,0.2
 NUM_OBSTACLE,NUM_AGENTS=3,3 #障碍物个数
 MAP_WIDTH=10 #地图为正方形
 NUM_DIRECTIONS=8
@@ -18,6 +18,7 @@ class State():
         self.num_agent=num_agent
         self.num_obstacle=NUM_OBSTACLE
         self.len_edge=len_edge
+
 
         #起点，终点，障碍
         self.map=self.generate_map() #4*num_agent
@@ -40,7 +41,7 @@ class State():
         return self.obstacle
 
     def move_agents(self,action):
-        #更新位置
+        #更新位置，若远离goal返回cost，靠近返回0
         # Action=np.array(action)
         # x_change=np.cos(Action.take([agent_id])*np.pi/NUM_DIRECTIONS).reshape(-1,1)
         # y_cahnge=np.sin(Action.take([agent_id])*np.pi/NUM_DIRECTIONS).reshape(-1,1)
@@ -49,9 +50,16 @@ class State():
         # self.observation=np.concatenate((self.map,self.obstacle_id.reshape(self.num_agent,-1),self.obs_agent.reshape(self.num_agent,-1)),axis=1)
         
         pos=self.map[action[0],0:2]  #当前智能体的二维坐标
-        change=STEP_LEN*np.stack([np.cos(action[1]*np.pi/NUM_DIRECTIONS),np.sin(action[1]*np.pi/NUM_DIRECTIONS)]).reshape(-1,2)
-        self.map[action[0],0:2]=pos+change
-        return 
+        goal=self.map[action[0],2:4]  #当前智能体终点坐标
+        change=STEP_LEN*np.stack([np.cos(action[1]*2*np.pi/NUM_DIRECTIONS),np.sin(action[1]*2*np.pi/NUM_DIRECTIONS)]).reshape(-1,2)
+        new_pos=pos+change
+        if np.linalg.norm(goal - pos, ord=2) > np.linalg.norm(goal - new_pos, ord=2):
+            cost=0
+        else:
+            cost=AWAY_COST
+        self.map[action[0],0:2]=new_pos
+        return cost
+
     
     def observe(self,id):
         #通过简略计算更新id智能体周围智能体和障碍编号
@@ -71,12 +79,16 @@ class State():
         x=pos_agent_mat-pos[id]
         dist_array=pdist(pos_agent_mat-pos[id],'cityblock')
         self.obstacle_id[id]=np.where(dist_array<OBSERVE_DIST,1,0)
+
+        #更新observation
+        self.observation = np.concatenate((self.map, self.obstacle_id.reshape(self.num_agent, -1), self.obs_agent.reshape((self.num_agent, -1))),axis=1)
         return
 
     
     def eval(self,id):
         #计算id号智能体的reward，返回r和id，若id号智能体到达终点，返回-1
-        reward=0
+        reward=ACTION_COST
+
         reward=reward+self.collide(id)
         if self.finish(id):
             reward=reward+GOAL_REWARD
@@ -86,12 +98,12 @@ class State():
     def collide(self,id):
         #返回id号智能体碰撞奖励
         #id号智能体当前二维位置
-        pos=self.observation[id,0:2]
+        pos=self.map[id,0:2]
 
         # 障碍 n*2
         obstacle_mat=self.obstacle.take(np.argwhere(self.obstacle_id[id]==1),axis=0).reshape(-1,2)
 
-        near_agent_index=self.observation[id,-self.num_agent:]
+        near_agent_index=self.obs_agent[id]
         #id号周围智能体二维位置
         agent_mat=self.map[:,0:2].take(np.argwhere(near_agent_index==1),axis=0).reshape(-1,2)
 
@@ -104,12 +116,14 @@ class State():
     def finish(self,id):
         now=self.map[id,0:2]
         goal=self.map[id,2:4]
-        if (now==goal).all():
+        dist=np.linalg.norm(goal-now,ord=2)
+        if dist<GOAL_E:
             return True
         else:
             return False
     
     def reset(self):
+
         self.map=self.generate_map()
         self.obstacle_id=np.ones((self.num_agent,self.num_obstacle))
         self.obs_agent = np.ones((self.num_agent, self.num_agent))
@@ -151,9 +165,10 @@ class MAPFEnv(gym.Env):
     def step(self,action):
         #接受动作，返回状态，奖励，done，info，action为(agent_id,direction)
         if action[0] in self.agent_id:
-            self.state.move_agents(action)
+            away_cost=self.state.move_agents(action)
             #获取奖励，判断是否到终点
             Reward,id=self.state.eval(action[0])
+            Reward=Reward+away_cost
             if id==-1:
                 #智能体到达终点，活动智能体索引中删除该编号
                 self.agent_id.remove(action[0])
@@ -176,7 +191,7 @@ class MAPFEnv(gym.Env):
 
 
     def reset(self):
-        self.agent_id=range(self.num_agent)
+        self.agent_id=list(range(self.num_agent))
         self.state.reset()
         return self.state.observation
     

@@ -7,7 +7,7 @@ from Env import NUM_OBSTACLE,NUM_AGENTS,NUM_DIRECTIONS
 
 BATCH_SIZE = 32     #从缓冲区采样过程的批大小
 LR = 0.01           #学习率
-EPSILON = 0.01       #epsilon greedy方法
+EPSILON = 0.9       #epsilon greedy方法
 GAMMA = 0.9         #衰减因子
 TARGET_NETWORK_REPLACE_FREQ = 100       #目标网络更新的频率
 N_STATES = NUM_AGENTS*(4+NUM_OBSTACLE+NUM_AGENTS)
@@ -20,9 +20,9 @@ class Net(nn.Module):
         #全连接网络，接受状态，输出动作空间中所有动作对应的Q值
         super(Net, self).__init__()
         #网络结构
-        self.fc1 = nn.Linear(N_STATES, 10)  # layer 1
+        self.fc1 = nn.Linear(N_STATES, 40)  # layer 1
         self.fc1.weight.data.normal_(0, 0.1) #初始化
-        self.out = nn.Linear(10, N_ACTIONS) # layer 2
+        self.out = nn.Linear(40, N_ACTIONS) # layer 2
         self.out.weight.data.normal_(0, 0.1) 
         
         

@@ -30,12 +30,16 @@ def DQN_Training():
             ep_r += r
             #如果经验回放池被填满，DQN开始学习或更新     
             if dqn.memory_counter > MEMORY_CAPACITY:
-                print('Collected')
                 dqn.learn()
 
                 if done:
                     print('Ep: ', i_episode, ' |', 'Ep_r: ', round(ep_r, 2))
-                print(env.state.get_remaining_dist())
+
+                if dqn.learn_step_counter%1000==0:
+                    print('step ',dqn.learn_step_counter,'remaining distance',env.state.get_remaining_dist(),' Reward ',ep_r)
+                    remaining_dist=env.state.get_remaining_dist()
+                    if remaining_dist>5000:
+                        done=True
             if done:
                 #游戏结束，退出while循环
                 break
