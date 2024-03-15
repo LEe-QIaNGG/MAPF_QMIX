@@ -61,7 +61,7 @@ class DQNet(object):
             #经验回放池 （s, a, r, s_）
             self.memory=np.zeros((MEMORY_CAPACITY, N_STATES * 2 + 3)) #r:1*1 a:1*2
             self.optimizer=torch.optim.Adam(self.eval_net.parameters(), lr=LR)
-        
+
         
 
     def  choose_action(self, x,env):

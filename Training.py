@@ -1,10 +1,12 @@
 import DQN
 import Env
+devcie=torch.devcie('cuda:0')
 
 MEMORY_CAPACITY=2000  #经验回放池大小
 
+
 def DQN_Training(check_point=False,PATH='./model'):
-    dqn= DQN.DQNet(MEMORY_CAPACITY,check_point,PATH)
+    dqn= DQN.DQNet(MEMORY_CAPACITY,check_point,PATH).to(devcie)
     env=Env.MAPFEnv()
 
     print("\nCollecting experience...")
