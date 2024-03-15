@@ -5,7 +5,7 @@ from scipy.spatial.distance import pdist,squareform
 import time
 
 #奖励的参数
-ACTION_COST, GOAL_REWARD, COLLISION_REWARD,FINISH_REWARD,AWAY_COST = -0.3, 1, -2.,20.,-1
+ACTION_COST,GOAL_REWARD,COLLISION_REWARD,FINISH_REWARD,AWAY_COST=-0.3, 1, -2.,20.,-1
 #碰撞的判定距离，智能体的视野距离,智能体的步长
 COLLID_E,OBSERVE_DIST,STEP_LEN,GOAL_E=0.3,2,0.1,0.2
 NUM_OBSTACLE,NUM_AGENTS=3,3 #障碍物个数

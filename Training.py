@@ -1,7 +1,7 @@
 import DQN
 import Env
 
-MEMORY_CAPACITY = 2000  #经验回放池大小
+MEMORY_CAPACITY=2000  #经验回放池大小
 
 def DQN_Training(check_point=False,PATH='./model'):
     dqn= DQN.DQNet(MEMORY_CAPACITY,check_point,PATH)
@@ -18,17 +18,11 @@ def DQN_Training(check_point=False,PATH='./model'):
             a = dqn.choose_action(s,env)
             s_, r, done, info = env.step(a)
             
-            # # modify the reward based on the environment state
-            # x, x_dot, theta, theta_dot = s_
-            # r1 = (env.x_threshold - abs(x)) / env.x_threshold - 0.8
-            # r2 = (env.theta_threshold_radians - abs(theta)) / env.theta_threshold_radians - 0.5
-            # r = r1 + r2
-            
             #保存经验
             dqn.store_transition(s, a, r, s_)
             
             ep_r += r
-            #如果经验回放池被填满，DQN开始学习或更新     
+            #经验回放池被填满，DQN开始学习或更新     
             if dqn.memory_counter > MEMORY_CAPACITY:
                 dqn.learn()
 
