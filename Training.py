@@ -3,8 +3,8 @@ import Env
 
 MEMORY_CAPACITY = 2000  #经验回放池大小
 
-def DQN_Training():
-    dqn= DQN.DQNet(MEMORY_CAPACITY)
+def DQN_Training(check_point=False,PATH='./model'):
+    dqn= DQN.DQNet(MEMORY_CAPACITY,check_point,PATH)
     env=Env.MAPFEnv()
 
     print("\nCollecting experience...")
@@ -35,9 +35,10 @@ def DQN_Training():
                 if done:
                     print('Ep: ', i_episode, ' |', 'Ep_r: ', round(ep_r, 2))
 
-                if dqn.learn_step_counter%1000==0:
-                    print('step ',dqn.learn_step_counter,'remaining distance',env.state.get_remaining_dist(),' Reward ',ep_r)
+                if dqn.learn_step_counter%10000==0:
                     remaining_dist=env.state.get_remaining_dist()
+                    print('step ',dqn.learn_step_counter,'agent_list',env.agent_id,'remaining distance',remaining_dist,' Reward ',ep_r)
+                    dqn.save_checkpoint('./model')
                     if remaining_dist>5000:
                         done=True
             if done:

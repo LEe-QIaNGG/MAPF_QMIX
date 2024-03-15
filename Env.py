@@ -5,11 +5,11 @@ from scipy.spatial.distance import pdist,squareform
 import time
 
 #奖励的参数
-ACTION_COST, GOAL_REWARD, COLLISION_REWARD,FINISH_REWARD,AWAY_COST = -0.3, 0.0, -2.,20.,-1
+ACTION_COST, GOAL_REWARD, COLLISION_REWARD,FINISH_REWARD,AWAY_COST = -0.3, 1, -2.,20.,-1
 #碰撞的判定距离，智能体的视野距离,智能体的步长
 COLLID_E,OBSERVE_DIST,STEP_LEN,GOAL_E=0.3,2,0.1,0.2
 NUM_OBSTACLE,NUM_AGENTS=3,3 #障碍物个数
-MAP_WIDTH=10 #地图为正方形
+MAP_WIDTH=20 #地图为正方形
 NUM_DIRECTIONS=8
 
 
@@ -21,8 +21,8 @@ class State():
 
 
         #起点，终点，障碍
-        self.map=self.generate_map() #4*num_agent
-        self.obstacle=self.generate_obstacle()  #num_obstacle*2
+        self.map,self.obstacle=self.generate_map() #4*num_agent  #num_obstacle*2
+ 
         self.obstacle_id=np.ones((num_agent,self.num_obstacle))#num_agent*num_obstacle
 
         #周围的智能体索引，对角线为零
@@ -32,13 +32,11 @@ class State():
         self.observation=np.concatenate((self.map,self.obstacle_id.reshape(self.num_agent,-1),self.obs_agent.reshape((self.num_agent,-1))),axis=1)
 
     def generate_map(self):
-        self.map=np.random.rand(self.num_agent,4)*self.len_edge/2
+        map=np.random.rand(self.num_agent,4)*self.len_edge/2
+        obstacle=np.random.rand(self.num_obstacle,2)*self.len_edge/2
         # print(self.map)
-        return self.map
+        return map,obstacle
 
-    def generate_obstacle(self):
-        self.obstacle=np.random.rand(self.num_obstacle,2)*self.len_edge/2
-        return self.obstacle
 
     def move_agents(self,action):
         #更新位置，若远离goal返回cost，靠近返回0

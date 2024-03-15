@@ -20,15 +20,19 @@ class Net(nn.Module):
         #全连接网络，接受状态，输出动作空间中所有动作对应的Q值
         super(Net, self).__init__()
         #网络结构
-        self.fc1 = nn.Linear(N_STATES, 40)  # layer 1
+        self.fc1 = nn.Linear(N_STATES, 40)  
         self.fc1.weight.data.normal_(0, 0.1) #初始化
-        self.out = nn.Linear(40, N_ACTIONS) # layer 2
+        self.fc2 = nn.Linear(40, 60)  
+        self.fc2.weight.data.normal_(0, 0.1) #初始化
+        self.out = nn.Linear(60, N_ACTIONS) 
         self.out.weight.data.normal_(0, 0.1) 
         
         
     def forward(self, x):
-        x = self.fc1(x.reshape(-1,N_STATES))
-        x = F.relu(x)
+        x=self.fc1(x.reshape(-1,N_STATES))
+        x=F.relu(x)
+        x=self.fc2(x)
+        x=F.LeakyReLU(x)
         actions_value = self.out(x)
         return actions_value
         
@@ -36,20 +40,29 @@ class Net(nn.Module):
 
 
 class DQNet(object):
-    def __init__(self,MEMORY_CAPACITY):
+    def __init__(self,MEMORY_CAPACITY,load_checkpoint=False,PATH=None):
         self.MEMORY_CAPACITY=MEMORY_CAPACITY
+        self.loss_func = nn.MSELoss()
         # 目标网络和训练网络
         self.eval_net, self.target_net = Net(), Net()
         
-        self.learn_step_counter = 0 #学习次数计数器
-        self.memory_counter = 0 #经验回放计数器
+        if load_checkpoint:
+            checkpoint = torch.load(PATH)
+            self.eval_net.load_state_dict(checkpoint['eval_state_dict'])
+            self.target_net.load_state_dict(checkpoint['target_state_dict'])
+            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            self.learn_step_counter=checkpoint['learn_step_counter']
+            self.memory_counter=checkpoint['memory_counter']
+            self.memory=checkpoint['memory']
+
+        else:
+            self.learn_step_counter = 0 #学习次数计数器
+            self.memory_counter = 0 #经验回放计数器
+            #经验回放池 （s, a, r, s_）
+            self.memory = np.zeros((MEMORY_CAPACITY, N_STATES * 2 + 3)) #r:1*1 a:1*2
+            self.optimizer = torch.optim.Adam(self.eval_net.parameters(), lr=LR)
         
-        #经验回放池 （s, a, r, s_）
-        self.memory = np.zeros((MEMORY_CAPACITY, N_STATES * 2 + 3)) #r:1*1 a:1*2
         
-        self.optimizer = torch.optim.Adam(self.eval_net.parameters(), lr=LR)
-        
-        self.loss_func = nn.MSELoss()
 
     def  choose_action(self, x,env):
         #实现epsilon greedy方法，接受当前状态，环境，返回动作
@@ -76,6 +89,7 @@ class DQNet(object):
         index = self.memory_counter % self.MEMORY_CAPACITY
         self.memory[index, :] = transition
         self.memory_counter += 1
+        return
         
     
     def learn(self):
@@ -110,6 +124,19 @@ class DQNet(object):
         self.optimizer.zero_grad() 
         loss.backward()
         self.optimizer.step() 
+        return
+
+    def save_checkpoint(self,path):
+        #保存模型，状态字典
+        torch.save({'eval_state_dict',self.eval_net.state_dict,
+                    'target_state_dict',self.target_net.state_dict,
+                    'optimizer_state_dict',self.optimizer.state_dict,
+                    'learn_step_counter',self.learn_step_counter,
+                    'memory_counter',self.memory_counter,
+                    'memory',self.memory
+                    },path)
+        return
+
 
 if __name__== "__main__":
     pass
