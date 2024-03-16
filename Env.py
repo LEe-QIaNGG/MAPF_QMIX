@@ -3,13 +3,16 @@ import numpy as np
 from gymnasium import spaces
 from scipy.spatial.distance import pdist,squareform
 import time
+from gym.envs.classic_control import rendering
 
 #奖励的参数
-GOAL_REWARD,COLLISION_REWARD,FINISH_REWARD,AWAY_COST,ACTION_COST=1,-2,20,-1,-0.5
+GOAL_REWARD,COLLISION_REWARD,FINISH_REWARD,AWAY_COST,ACTION_COST=2,-3,5,-1,-1
 #碰撞的判定距离，智能体的视野距离,智能体的步长
-COLLID_E,OBSERVE_DIST,STEP_LEN,GOAL_E=0.3,2,0.1,0.2
+COLLID_E,OBSERVE_DIST,STEP_LEN,GOAL_E=0.5,2.5,0.1,0.2
 NUM_OBSTACLE,NUM_AGENTS=3,3 #障碍物个数
 MAP_WIDTH=20 #地图为正方形
+SCREEN_WIDTH=400
+DRAW_MUTIPLE=SCREEN_WIDTH/MAP_WIDTH
 NUM_DIRECTIONS=8
 
 
@@ -29,23 +32,17 @@ class State():
         self.obs_agent=np.ones((num_agent,num_agent))
         np.fill_diagonal(self.obs_agent,0)
 
-        self.observation=np.concatenate((self.map,self.obstacle_id.reshape(self.num_agent,-1),self.obs_agent.reshape((self.num_agent,-1))),axis=1)
+        self.observation=np.concatenate((self.map[:,0:2],self.obstacle_id.reshape(self.num_agent,-1),self.obs_agent.reshape((self.num_agent,-1))),axis=1)
 
     def generate_map(self):
-        map=np.random.rand(self.num_agent,4)*self.len_edge/2
-        obstacle=np.random.rand(self.num_obstacle,2)*self.len_edge/2
+        map=np.random.rand(self.num_agent,4)*self.len_edge
+        obstacle=np.random.rand(self.num_obstacle,2)*self.len_edge
         # print(self.map)
         return map,obstacle
 
 
     def move_agents(self,action):
         #更新位置，若远离goal返回cost，靠近返回0
-        # Action=np.array(action)
-        # x_change=np.cos(Action.take([agent_id])*np.pi/NUM_DIRECTIONS).reshape(-1,1)
-        # y_cahnge=np.sin(Action.take([agent_id])*np.pi/NUM_DIRECTIONS).reshape(-1,1)
-        # change=STEP_LEN*np.stack([x_change,y_cahnge]).reshape(-1,2)
-        # self.map[agent_id,0:2]=self.map[agent_id,0:2]+change
-        # self.observation=np.concatenate((self.map,self.obstacle_id.reshape(self.num_agent,-1),self.obs_agent.reshape(self.num_agent,-1)),axis=1)
         
         pos=self.map[action[0],0:2]  #当前智能体的二维坐标
         goal=self.map[action[0],2:4]  #当前智能体终点坐标
@@ -80,7 +77,7 @@ class State():
         self.obstacle_id[id]=np.where(dist_array<OBSERVE_DIST,1,0)
 
         #更新observation
-        self.observation = np.concatenate((self.map, self.obstacle_id.reshape(self.num_agent, -1), self.obs_agent.reshape((self.num_agent, -1))),axis=1)
+        self.observation = np.concatenate((self.map[:,0:2], self.obstacle_id.reshape(self.num_agent, -1), self.obs_agent.reshape((self.num_agent, -1))),axis=1)
         return self.observation
 
     
@@ -126,7 +123,7 @@ class State():
         self.obstacle_id=np.ones((self.num_agent,self.num_obstacle))
         self.obs_agent = np.ones((self.num_agent, self.num_agent))
         np.fill_diagonal(self.obs_agent, 0)
-        self.observation = np.concatenate((self.map, self.obstacle_id.reshape(self.num_agent, -1), self.obs_agent.reshape((self.num_agent, -1))),axis=1)
+        self.observation = np.concatenate((self.map[:,0:2], self.obstacle_id.reshape(self.num_agent, -1), self.obs_agent.reshape((self.num_agent, -1))),axis=1)
         return
 
     def norm_two(self,mat,e):
@@ -145,10 +142,12 @@ class State():
 
 
 class MAPFEnv(gym.Env):
+    metadata = {'render.modes':['human','rgb_array'],'video.frames_per_second': 2}
     def  __init__(self):
         self.num_agent=NUM_AGENTS
         self.agent_id=list(range(self.num_agent))
         self.len_edge=MAP_WIDTH
+        self.viewer = rendering.Viewer(SCREEN_WIDTH*3, SCREEN_WIDTH*3)
 
         #动作空间简化为离散的N个方向，每次只有一个智能体移动
         # self.action_space=spaces.Box(low=0,high=NUM_DIRECTIONS-1,shape=(1,self.num_agent),dtype=np.int64)
@@ -189,21 +188,37 @@ class MAPFEnv(gym.Env):
 
         return observation,Reward,done,info
 
-
-
     def reset(self):
+        self.viewer = rendering.Viewer(SCREEN_WIDTH*2, SCREEN_WIDTH*2)
         self.agent_id=list(range(self.num_agent))
         self.state.reset()
         return self.state.observation
     
     def render(self,mode='human'):
-        pass
+        #画障碍
+        for o in self.state.obstacle:
+            self.viewer.draw_circle(
+                COLLID_E*DRAW_MUTIPLE/2, 4, True, color=(0, 0, 0)
+            ).add_attr(rendering.Transform(o*DRAW_MUTIPLE+[SCREEN_WIDTH/2,SCREEN_WIDTH/2]))
+
+        #画智能体
+        for a in self.state.map[:,0:2]:
+            self.viewer.draw_circle(
+                COLLID_E*DRAW_MUTIPLE/2, 30, True, color=(0, 0, 255)
+            ).add_attr(rendering.Transform(a*DRAW_MUTIPLE+[SCREEN_WIDTH/2,SCREEN_WIDTH/2]))
+
+        #画终点
+        for g in self.state.map[:,2:4]:
+            self.viewer.draw_circle(
+                COLLID_E*DRAW_MUTIPLE/2, 6, True, color=(0, 255, 0)
+            ).add_attr(rendering.Transform(g*DRAW_MUTIPLE+[SCREEN_WIDTH/2,SCREEN_WIDTH/2]))
+        return self.viewer.render(return_rgb_array=mode == 'human')
     
     def seed(self,seed=None):
         pass
     
     def close(self):
-        pass
+        self.viewer.close()
 
 
 if __name__== "__main__":
@@ -211,18 +226,15 @@ if __name__== "__main__":
     # print(env.action_space.sample())
     # # check_env(env)
     #测试
-    for epoch in range(5):
+    for epoch in range(2):
         for epoch in range(5):
             env.reset()
             print('Epoch', epoch+1, ': ',end='\n')
-            print('remaining distance:',env.state.get_remaining_dist(), end='')
-            env.render()    # 刷新画面
-            time.sleep(0.5)
+            # print('remaining distance:',env.state.get_remaining_dist(), end='')
             for i in range(5):
                 _,r,_,_=env.step(env.action_space.sample())     # 随机选择一个动作执行
                 print('remaining distance:', env.state.get_remaining_dist(),' Reward:',r, end='\n')
                 env.render()    # 刷新画面
-                time.sleep(0.5)
-        print()
-    env.close()
+                time.sleep(0.2)
 
+    env.close()

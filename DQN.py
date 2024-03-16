@@ -6,10 +6,10 @@ from Env import NUM_OBSTACLE,NUM_AGENTS,NUM_DIRECTIONS
 
 BATCH_SIZE=128    #从缓冲区采样过程的批大小
 LR=0.01           #学习率
-EPSILON=0.8       #epsilon greedy方法
+EPSILON=0.9       #epsilon greedy方法
 GAMMA=0.9         #衰减因子
-TARGET_NETWORK_REPLACE_FREQ=100       #目标网络更新的频率
-N_STATES=NUM_AGENTS*(4+NUM_OBSTACLE+NUM_AGENTS)   #状态空间大小
+TARGET_NETWORK_REPLACE_FREQ=80       #目标网络更新的频率
+N_STATES=NUM_AGENTS*(2+NUM_OBSTACLE+NUM_AGENTS)   #状态空间大小
 N_ACTIONS=NUM_DIRECTIONS*NUM_AGENTS    #动作空间大小
 
 device=torch.device('cuda:0')
