@@ -5,7 +5,7 @@ from scipy.spatial.distance import pdist,squareform
 import time
 
 #奖励的参数
-ACTION_COST,GOAL_REWARD,COLLISION_REWARD,FINISH_REWARD,AWAY_COST = -0.3, 1, -2.,20.,-1
+GOAL_REWARD,COLLISION_REWARD,FINISH_REWARD,AWAY_COST,ACTION_COST=1,-2,20,-1,-0.5
 #碰撞的判定距离，智能体的视野距离,智能体的步长
 COLLID_E,OBSERVE_DIST,STEP_LEN,GOAL_E=0.3,2,0.1,0.2
 NUM_OBSTACLE,NUM_AGENTS=3,3 #障碍物个数
@@ -75,17 +75,18 @@ class State():
         #更新障碍索引
         pos_agent_mat=self.obstacle
         x=pos_agent_mat-pos[id]
-        dist_array=pdist(pos_agent_mat-pos[id],'cityblock')
+        # dist_array=pdist(pos_agent_mat-pos[id],'cityblock')
+        dist_array=np.linalg.norm(x,ord=2,axis=1)
         self.obstacle_id[id]=np.where(dist_array<OBSERVE_DIST,1,0)
 
         #更新observation
         self.observation = np.concatenate((self.map, self.obstacle_id.reshape(self.num_agent, -1), self.obs_agent.reshape((self.num_agent, -1))),axis=1)
-        return
+        return self.observation
 
     
     def eval(self,id):
         #计算id号智能体的reward，返回r和id，若id号智能体到达终点，返回-1
-        reward=ACTION_COST
+        reward=0
 
         reward=reward+self.collide(id)
         if self.finish(id):
@@ -121,8 +122,7 @@ class State():
             return False
     
     def reset(self):
-
-        self.map=self.generate_map()
+        self.map,_=self.generate_map()
         self.obstacle_id=np.ones((self.num_agent,self.num_obstacle))
         self.obs_agent = np.ones((self.num_agent, self.num_agent))
         np.fill_diagonal(self.obs_agent, 0)
@@ -152,7 +152,7 @@ class MAPFEnv(gym.Env):
 
         #动作空间简化为离散的N个方向，每次只有一个智能体移动
         # self.action_space=spaces.Box(low=0,high=NUM_DIRECTIONS-1,shape=(1,self.num_agent),dtype=np.int64)
-        self.action_space = spaces.Tuple([spaces.Discrete(self.num_agent), spaces.Discrete(NUM_DIRECTIONS)])
+        self.action_space=spaces.Tuple([spaces.Discrete(self.num_agent), spaces.Discrete(NUM_DIRECTIONS)])
 
         #观察空间为智能体的二维位置，即2*N的nparray
         # self.observation_space=spaces.Discrete(self.num_agent)
@@ -170,21 +170,24 @@ class MAPFEnv(gym.Env):
             if id==-1:
                 #智能体到达终点，活动智能体索引中删除该编号
                 self.agent_id.remove(action[0])
+                observation=self.state.observation
             else:
                 #没有到达终点的话，更新智能体周围智能体和障碍信息
                 observation=self.state.observe(action[0])
         else:
             #该智能体已到终点，无需做动作
-            Reward=GOAL_REWARD
+            observation = self.state.observation
+            Reward=ACTION_COST
         
         info={}
-        observation=self.state.observation
 
         if self.agent_id==[]:
             Reward=Reward+FINISH_REWARD
-            return observation,Reward,True,info
+            done=True
+        else:
+            done=False
 
-        return observation,Reward,False,info
+        return observation,Reward,done,info
 
 
 
@@ -204,7 +207,6 @@ class MAPFEnv(gym.Env):
 
 
 if __name__== "__main__":
-    from stable_baselines3.common.env_checker import check_env 
     env=MAPFEnv()
     # print(env.action_space.sample())
     # # check_env(env)
