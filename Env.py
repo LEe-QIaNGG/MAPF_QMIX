@@ -8,7 +8,9 @@ from gym.envs.classic_control import rendering
 #奖励的参数
 GOAL_REWARD,COLLISION_REWARD,FINISH_REWARD,AWAY_COST,ACTION_COST=2,-3,5,-1,-1
 #碰撞的判定距离，智能体的视野距离,智能体的步长
-COLLID_E,OBSERVE_DIST,STEP_LEN,GOAL_E=0.5,2.5,0.1,0.2
+COLLID_E,OBSERVE_DIST,STEP_LEN,GOAL_E=0.5,2.5,0.8,0.2
+#状态空间 方向矩阵大小
+OBSERVATION_SIZE=4
 NUM_OBSTACLE,NUM_AGENTS=3,3 #障碍物个数
 MAP_WIDTH=20 #地图为正方形
 SCREEN_WIDTH=400
@@ -25,14 +27,14 @@ class State():
 
         #起点，终点，障碍
         self.map,self.obstacle=self.generate_map() #4*num_agent  #num_obstacle*2
- 
+        #障碍索引
         self.obstacle_id=np.ones((num_agent,self.num_obstacle))#num_agent*num_obstacle
-
         #周围的智能体索引，对角线为零
         self.obs_agent=np.ones((num_agent,num_agent))
         np.fill_diagonal(self.obs_agent,0)
-
-        self.observation=np.concatenate((self.map[:,0:2],self.obstacle_id.reshape(self.num_agent,-1),self.obs_agent.reshape((self.num_agent,-1))),axis=1)
+        #状态方向矩阵
+        self.direction_mat=np.ones((NUM_AGENTS,OBSERVATION_SIZE))*-1
+        self.observation=np.concatenate((self.map[:,0:2],self.direction_mat),axis=1)
 
     def generate_map(self):
         map=np.random.rand(self.num_agent,4)*self.len_edge
@@ -57,7 +59,7 @@ class State():
 
     
     def observe(self,id):
-        #通过简略计算更新id智能体周围智能体和障碍编号
+        #通过简略计算更新id智能体周围智能体和障碍编号，返回状态
 
         #所有智能体的二维位置
         pos=self.map[:,0:2]
@@ -75,11 +77,35 @@ class State():
         # dist_array=pdist(pos_agent_mat-pos[id],'cityblock')
         dist_array=np.linalg.norm(x,ord=2,axis=1)
         self.obstacle_id[id]=np.where(dist_array<OBSERVE_DIST,1,0)
+        #计算状态
+        dist_array=np.concatenate((dist_mat[id],dist_array),axis=0)  #智能体和障碍的距离向量拼接
+        pos_tot=np.concatenate((pos,pos_agent_mat))
+        #满足距离的
+        index=np.argwhere((dist_array<OBSERVE_DIST) & (dist_array>0))
 
-        #更新observation
-        self.observation = np.concatenate((self.map[:,0:2], self.obstacle_id.reshape(self.num_agent, -1), self.obs_agent.reshape((self.num_agent, -1))),axis=1)
+        if len(index)>0 and len(index)<OBSERVATION_SIZE:
+            self.get_direction(pos_tot[index], pos[id], id)
+        elif len(index)>OBSERVATION_SIZE:
+            pos_tot = pos_tot[index]
+            dist_array = dist_array[index]
+            index=np.argpartition(dist_array,OBSERVATION_SIZE)[0:OBSERVATION_SIZE]  #得到前OBSERVATION_SIZE大小近的智能体和障碍索引
+            #在视野范围外的就不算方向了
+
+            self.get_direction(pos_tot[index],pos[id],id)
+            #更新observation
+        self.observation = np.concatenate((self.map[:,0:2], self.direction_mat),axis=1)
         return self.observation
 
+    def get_direction(self,near_pos,this_pos,id):
+            #根据id号智能体最近的物体位置和自己位置，更新对各物体的方向向量 direction_mat
+            difference=near_pos-this_pos
+            difference=difference.reshape(-1,2)
+            rad=np.arctan(difference[:,1]/difference[:,0])  #-pi/2,pi/2
+            x=np.where(difference[:,0]>0,0,np.pi)
+            arr=rad+x
+            arr=np.pad(arr,(0,OBSERVATION_SIZE-len(arr)),'constant',constant_values=(0,-1))
+            self.direction_mat[id]=arr
+            return
     
     def eval(self,id):
         #计算id号智能体的reward，返回r和id，若id号智能体到达终点，返回-1
@@ -123,7 +149,7 @@ class State():
         self.obstacle_id=np.ones((self.num_agent,self.num_obstacle))
         self.obs_agent = np.ones((self.num_agent, self.num_agent))
         np.fill_diagonal(self.obs_agent, 0)
-        self.observation = np.concatenate((self.map[:,0:2], self.obstacle_id.reshape(self.num_agent, -1), self.obs_agent.reshape((self.num_agent, -1))),axis=1)
+        self.observation = np.concatenate((self.map[:,0:2], self.direction_mat),axis=1)
         return
 
     def norm_two(self,mat,e):
@@ -147,7 +173,7 @@ class MAPFEnv(gym.Env):
         self.num_agent=NUM_AGENTS
         self.agent_id=list(range(self.num_agent))
         self.len_edge=MAP_WIDTH
-        self.viewer = rendering.Viewer(SCREEN_WIDTH*3, SCREEN_WIDTH*3)
+        self.viewer = rendering.Viewer(SCREEN_WIDTH*2, SCREEN_WIDTH*2)
 
         #动作空间简化为离散的N个方向，每次只有一个智能体移动
         # self.action_space=spaces.Box(low=0,high=NUM_DIRECTIONS-1,shape=(1,self.num_agent),dtype=np.int64)
@@ -189,7 +215,7 @@ class MAPFEnv(gym.Env):
         return observation,Reward,done,info
 
     def reset(self):
-        self.viewer = rendering.Viewer(SCREEN_WIDTH*2, SCREEN_WIDTH*2)
+        # self.viewer = rendering.Viewer(SCREEN_WIDTH*3, SCREEN_WIDTH*3)
         self.agent_id=list(range(self.num_agent))
         self.state.reset()
         return self.state.observation
