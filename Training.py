@@ -3,10 +3,10 @@ import Env
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
-MEMORY_CAPACITY=8000  #经验回放池大小
+MEMORY_CAPACITY=2000  #经验回放池大小
 
 
-def DQN_Training(check_point=False,PATH='./checkpoints/checkpoint_DQN_8agent_8obstacle_8directions_210000.pkl'):
+def DQN_Training(check_point=False,PATH='./checkpoints/checkpoint_DQN_3agent_3obstacle_8directions_110000.pkl'):
     dqn= DQN.DQNet(MEMORY_CAPACITY,check_point,PATH)
     env=Env.MAPFEnv()
 
@@ -17,8 +17,10 @@ def DQN_Training(check_point=False,PATH='./checkpoints/checkpoint_DQN_8agent_8ob
         ep_r = 0
         while True:
             env.render()
-
-            a = dqn.choose_action(s,env)
+            if check_point or dqn.memory_counter > MEMORY_CAPACITY:
+                a = dqn.choose_action(s,env)
+            else:
+                a=env.action_space.sample()
             s_, r, done, info = env.step(a)
             
             #保存经验

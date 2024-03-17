@@ -6,7 +6,7 @@ import time
 from gym.envs.classic_control import rendering
 
 #奖励的参数
-GOAL_REWARD,COLLISION_REWARD,FINISH_REWARD,AWAY_COST,ACTION_COST=2,-3,5,-1,-1
+GOAL_REWARD,COLLISION_REWARD,FINISH_REWARD,AWAY_COST,ACTION_COST=2,-3,5,-2,-0.5
 #碰撞的判定距离，智能体的视野距离,智能体的步长
 COLLID_E,OBSERVE_DIST,STEP_LEN,GOAL_E=0.5,2.5,0.8,0.2
 #状态空间 方向矩阵大小
@@ -34,7 +34,7 @@ class State():
         np.fill_diagonal(self.obs_agent,0)
         #状态方向矩阵
         self.direction_mat=np.ones((NUM_AGENTS,OBSERVATION_SIZE))*-1
-        self.observation=np.concatenate((self.map[:,0:2],self.direction_mat),axis=1)
+        self.observation=np.concatenate((self.map,self.direction_mat),axis=1)
 
     def generate_map(self):
         map=np.random.rand(self.num_agent,4)*self.len_edge
@@ -93,7 +93,7 @@ class State():
 
             self.get_direction(pos_tot[index],pos[id],id)
             #更新observation
-        self.observation = np.concatenate((self.map[:,0:2], self.direction_mat),axis=1)
+        self.observation = np.concatenate((self.map, self.direction_mat),axis=1)
         return self.observation
 
     def get_direction(self,near_pos,this_pos,id):
@@ -149,7 +149,7 @@ class State():
         self.obstacle_id=np.ones((self.num_agent,self.num_obstacle))
         self.obs_agent = np.ones((self.num_agent, self.num_agent))
         np.fill_diagonal(self.obs_agent, 0)
-        self.observation = np.concatenate((self.map[:,0:2], self.direction_mat),axis=1)
+        self.observation = np.concatenate((self.map, self.direction_mat),axis=1)
         return
 
     def norm_two(self,mat,e):
@@ -186,6 +186,7 @@ class MAPFEnv(gym.Env):
         self.state=State(self.num_agent,self.len_edge)
 
     def step(self,action):
+        info = []
         #接受动作，返回状态，奖励，done，info，action为(agent_id,direction)
         if action[0] in self.agent_id:
             away_cost=self.state.move_agents(action)
@@ -196,15 +197,18 @@ class MAPFEnv(gym.Env):
                 #智能体到达终点，活动智能体索引中删除该编号
                 self.agent_id.remove(action[0])
                 observation=self.state.observation
+                info=[action[0],'智能体到达终点']
             else:
+                info = [action[0], '智能体移动','away_cost:',away_cost]
                 #没有到达终点的话，更新智能体周围智能体和障碍信息
                 observation=self.state.observe(action[0])
         else:
             #该智能体已到终点，无需做动作
+            info = [action[0], '智能体已在终点']
             observation = self.state.observation
             Reward=ACTION_COST
         
-        info={}
+
 
         if self.agent_id==[]:
             Reward=Reward+FINISH_REWARD
