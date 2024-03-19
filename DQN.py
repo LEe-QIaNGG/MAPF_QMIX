@@ -85,7 +85,6 @@ class DQNet(object):
         
     def store_transition(self, s, a, r, s_):
         #存储经验
-
         transition=np.concatenate([s.reshape(1,-1), np.array(a).reshape(1,-1),np.array(r).reshape(1,-1), s_.reshape(1,-1)],axis=1) #水平叠加这些矢向量
         #如果容量已满，则使用index将旧内存替换为新内存
         index=self.memory_counter % self.MEMORY_CAPACITY
