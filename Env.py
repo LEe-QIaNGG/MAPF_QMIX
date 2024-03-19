@@ -8,7 +8,7 @@ from gym.envs.classic_control import rendering
 #奖励的参数
 GOAL_REWARD,COLLISION_REWARD,FINISH_REWARD,AWAY_COST,ACTION_COST=2,-3,5,-2,-0.5
 #碰撞的判定距离，智能体的视野距离,智能体的步长
-COLLID_E,OBSERVE_DIST,STEP_LEN,GOAL_E=0.5,2.5,0.8,0.2
+COLLID_E,OBSERVE_DIST,STEP_LEN,GOAL_E=0.5,2.5,0.1,0.2
 #状态空间 方向矩阵大小
 OBSERVATION_SIZE=4
 NUM_OBSTACLE,NUM_AGENTS=3,3 #障碍物个数
@@ -33,7 +33,7 @@ class State():
         self.obs_agent=np.ones((num_agent,num_agent))
         np.fill_diagonal(self.obs_agent,0)
         #状态方向矩阵
-        self.direction_mat=np.ones((NUM_AGENTS,OBSERVATION_SIZE))*-1
+        self.direction_mat=np.zeros((NUM_AGENTS,OBSERVATION_SIZE*2))
         self.observation=np.concatenate((self.map,self.direction_mat),axis=1)
 
     def generate_map(self):
@@ -77,6 +77,7 @@ class State():
         # dist_array=pdist(pos_agent_mat-pos[id],'cityblock')
         dist_array=np.linalg.norm(x,ord=2,axis=1)
         self.obstacle_id[id]=np.where(dist_array<OBSERVE_DIST,1,0)
+
         #计算状态
         dist_array=np.concatenate((dist_mat[id],dist_array),axis=0)  #智能体和障碍的距离向量拼接
         pos_tot=np.concatenate((pos,pos_agent_mat))
@@ -84,16 +85,17 @@ class State():
         index=np.argwhere((dist_array<OBSERVE_DIST) & (dist_array>0))
 
         if len(index)>0 and len(index)<OBSERVATION_SIZE:
-            self.get_direction(pos_tot[index], pos[id], id)
+            observe_array=np.pad(pos_tot[index].reshape(-1),(0,(OBSERVATION_SIZE-len(index))*2),'constant',constant_values=(0,0))
+            self.direction_mat[id]=observe_array
         elif len(index)>OBSERVATION_SIZE:
-            pos_tot = pos_tot[index]
-            dist_array = dist_array[index]
             index=np.argpartition(dist_array,OBSERVATION_SIZE)[0:OBSERVATION_SIZE]  #得到前OBSERVATION_SIZE大小近的智能体和障碍索引
             #在视野范围外的就不算方向了
 
-            self.get_direction(pos_tot[index],pos[id],id)
+            self.direction_mat[id]=pos_tot[index].reshape(-1)
             #更新observation
-        self.observation = np.concatenate((self.map, self.direction_mat),axis=1)
+        else:
+            self.direction_mat[id]= np.zeros(OBSERVATION_SIZE*2)
+        self.observation = np.concatenate((self.map,self.direction_mat),axis=1)
         return self.observation
 
     def get_direction(self,near_pos,this_pos,id):
@@ -149,6 +151,7 @@ class State():
         self.obstacle_id=np.ones((self.num_agent,self.num_obstacle))
         self.obs_agent = np.ones((self.num_agent, self.num_agent))
         np.fill_diagonal(self.obs_agent, 0)
+        self.direction_mat=np.zeros((NUM_AGENTS,OBSERVATION_SIZE*2))
         self.observation = np.concatenate((self.map, self.direction_mat),axis=1)
         return
 
@@ -196,7 +199,8 @@ class MAPFEnv(gym.Env):
             if id==-1:
                 #智能体到达终点，活动智能体索引中删除该编号
                 self.agent_id.remove(action[0])
-                observation=self.state.observation
+                self.state.direction_mat[action[0]]=np.ones(OBSERVATION_SIZE*2)*-1
+                observation=np.concatenate((self.state.map, self.state.direction_mat),axis=1)
                 info=[action[0],'智能体到达终点']
             else:
                 info = [action[0], '智能体移动','away_cost:',away_cost]

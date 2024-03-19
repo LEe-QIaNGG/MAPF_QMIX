@@ -6,7 +6,7 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 MEMORY_CAPACITY=2000  #经验回放池大小
 
 
-def DQN_Training(check_point=False,PATH='./checkpoints/checkpoint_DQN_3agent_3obstacle_8directions_110000.pkl'):
+def DQN_Training(check_point=False,PATH='./checkpoints/checkpoint_DQN_3agent_3obstacle_8directions_5253.pkl'):
     dqn= DQN.DQNet(MEMORY_CAPACITY,check_point,PATH)
     env=Env.MAPFEnv()
 
@@ -39,7 +39,7 @@ def DQN_Training(check_point=False,PATH='./checkpoints/checkpoint_DQN_3agent_3ob
                     print('Ep: ', i_episode,'step ',dqn.learn_step_counter,'agent_list',
                           env.agent_id,'remaining distance',remaining_dist,' Reward ',ep_r,end='\n')
                     print(env.state.map,'\n',env.state.obstacle)
-                    if remaining_dist>10000 or dqn.learn_step_counter>100000:
+                    if remaining_dist>200 or dqn.learn_step_counter>40000:
                         done=True
             if done:
                 dqn.save_checkpoint('./checkpoints')
