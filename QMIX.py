@@ -5,11 +5,12 @@ import numpy as np
 
 from Env import NUM_OBSTACLE,NUM_AGENTS,NUM_DIRECTIONS,OBSERVATION_SIZE
 N_ACTIONS=NUM_DIRECTIONS*NUM_AGENTS    #动作空间大小
+GAMMA=0.9 
 
 device=torch.device('cuda:0')
 
 class RNN(nn.Module):
-
+    #输出q：(-1，N_ACTIONS)   h：(-1,rnn_hidden_dim)
     # 所有 Agent 共享同一网络, 因此 input_shape = obs_shape + n_actions + n_agents（one_hot_code）
     def __init__(self, input_shape, rnn_hidden_dim):
         super().__init__()
@@ -27,15 +28,13 @@ class RNN(nn.Module):
         q = self.fc2(h)                      # h 是这一时刻的隐状态，用于输到下一时刻的RNN网络中去，q 是真实行为Q值输出
         return q, h
     
+    def init_hidden(self):
+        # make hidden states on same device as model
+        return self.fc1.weight.new(1, self.rnn_hidden_dim).zero_()
 
-class QMIXNet(nn.Module):
-
+class MIXNet(nn.Module):
     def __init__(self, arglist):
         super().__init__()
-        self.arglist = arglist
-        self.memory_counter = 0  # 经验回放计数器
-        self.eval_net,self.target_net=RNN().to(device),RNN().to(device)
-
         # 因为生成的 hyper_w1 需要是一个矩阵，而 pytorch 神经网络只能输出一个向量，
         # 所以就先输出长度为需要的 矩阵行*矩阵列 的向量，然后再转化成矩阵
 
@@ -81,51 +80,66 @@ class QMIXNet(nn.Module):
         q_total = torch.bmm(hidden, w2) + b2
         q_total = q_total.view(episode_num, -1, 1)
         return q_total
+    
+    
 
-    def choose_action(self, obs, last_action, agent_num, avail_actions, epsilon, maven_z=None, evaluate=False):
+class QMIX(nn.Module):
+
+    def __init__(self, arglist):
+        super().__init__()
+        self.arglist = arglist
+        self.memory_counter = 0  # 经验回放计数器
+        self.eval_rnn,self.target_rnn=RNN().to(device),RNN().to(device)#初始化agent网络
+        self.target_mix_net,self.eval_mix_net=MIXNet().to(device),MIXNet.to(device)
+        self.optimizer=torch.optim.Adam()
+        #保存隐藏层参数
+        self.eval_hidden
+
+
+    def choose_action(self, obs, last_action, agent_num, avail_actions, epsilon, env,maven_z=None, evaluate=False):
         inputs = obs.copy()
-        avail_actions_ind = np.nonzero(avail_actions)[0]  # index of actions which can be choose
+        # avail_actions_ind = np.nonzero(avail_actions)[0]  # index of actions which can be choose
 
-        # transform agent_num to onehot vector
-        agent_id = np.zeros(self.n_agents)
-        agent_id[agent_num] = 1.
+        # # transform agent_num to onehot vector
+        # agent_id = np.zeros(self.n_agents)
+        # agent_id[agent_num] = 1.
 
-        if self.args.last_action:
-            inputs = np.hstack((inputs, last_action))
-        if self.args.reuse_network:
-            inputs = np.hstack((inputs, agent_id))
-        # print("input:", inputs, last_action, agent_id)
-        # print("hidden:", self.policy.eval_hidden.shape)
-        hidden_state = self.policy.eval_hidden[:, agent_num, :]
+        # if self.args.last_action:
+        #     inputs = np.hstack((inputs, last_action))
+        # if self.args.reuse_network:
+        #     inputs = np.hstack((inputs, agent_id))
+
+        hidden_state = self.eval_hidden[:, agent_num, :]
 
         # transform the shape of inputs from (42,) to (1,42)
         inputs = torch.tensor(inputs, dtype=torch.float32).unsqueeze(0)
         avail_actions = torch.tensor(avail_actions, dtype=torch.float32).unsqueeze(0)
-        if self.args.cuda:
-            inputs = inputs.cuda()
-            hidden_state = hidden_state.cuda()
 
-        # get q value
+        # if self.args.cuda:
+        #     inputs = inputs.cuda()
+        #     hidden_state = hidden_state.cuda()
 
-        q_value, self.policy.eval_hidden[:, agent_num, :] = self.policy.eval_rnn(inputs, hidden_state)
+        # 计算Q值
+        q_value, self.eval_hidden[:, agent_num, :] = self.eval_rnn(inputs, hidden_state)
 
         # choose action from q value
-
         q_value[avail_actions == 0.0] = - float("inf")
         if np.random.uniform() < epsilon:
-            action = np.random.choice(avail_actions_ind)  # action是一个整数
+            action=env.action_space.sample()
         else:
-            action = torch.argmax(q_value)
+            Index = torch.argmax(q_value)
+            #动作空间的序号转动作向量
+            action=tuple([int(Index/NUM_DIRECTIONS),int(Index%NUM_DIRECTIONS)])
         return action
 
-    def store_transition(self, s, a, r, s_):
+    def store_transition(self, s, a, r, s_,ExperienceBuffer):
         #存储经验
         transition=np.concatenate([s.reshape(1,-1), np.array(a).reshape(1,-1),np.array(r).reshape(1,-1), s_.reshape(1,-1)],axis=1) #水平叠加这些矢向量
         #如果容量已满，则使用index将旧内存替换为新内存
         index=self.memory_counter % self.MEMORY_CAPACITY
         self.memory[index, :]=transition
         self.memory_counter += 1
-        return
+        return ExperienceBuffer
 
     def _get_inputs(self, batch, transition_idx):
         # 取出所有episode上该transition_idx的经验，u_onehot要取出所有，因为要用到上一条
@@ -208,10 +222,10 @@ class QMIXNet(nn.Module):
         q_targets[avail_u_next == 0.0] = - 9999999
         q_targets = q_targets.max(dim=3)[0]
 
-        q_total_eval = self.eval_qmix_net(q_evals, s)
-        q_total_target = self.target_qmix_net(q_targets, s_next)
+        q_total_eval = self.eval_mix_net(q_evals, s)
+        q_total_target = self.target_mix_net(q_targets, s_next)
 
-        targets = r + self.args.gamma * q_total_target * (1 - terminated)
+        targets = r + GAMMA * q_total_target * (1 - terminated)
 
         td_error = (q_total_eval - targets.detach())
         masked_td_error = mask * td_error  # 抹掉填充的经验的td_error
@@ -220,9 +234,10 @@ class QMIXNet(nn.Module):
         loss = (masked_td_error ** 2).sum() / mask.sum()
         self.optimizer.zero_grad()
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.eval_parameters, self.args.grad_norm_clip)
+        #梯度截断
+        # torch.nn.utils.clip_grad_norm_(self.eval_parameters, self.args.grad_norm_clip)
         self.optimizer.step()
 
         if train_step > 0 and train_step % self.args.target_update_cycle == 0:
             self.target_rnn.load_state_dict(self.eval_rnn.state_dict())
-            self.target_qmix_net.load_state_dict(self.eval_qmix_net.state_dict())
+            self.target_mix_net.load_state_dict(self.eval_mix_net.state_dict())

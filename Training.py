@@ -52,19 +52,21 @@ def DQN_Training(check_point=False,PATH='./checkpoints/checkpoint_DQN_3agent_3ob
 
 
 def QMIX_Training(check_point=False,Path=None):
-    qmix=QMIX.QMIXNet()
+    qmix=QMIX.QMIX()
     env = Env.MAPFEnv()
+    ExperienceBuffer=[]
     for i_episode in range(400):
         s=env.reset()
         for i_step in range(1000):
-            action=qmix.choose_action(s)
+            action=qmix.choose_action(s,env=env)
             s_,r,done,info=env.step(action)
-            qmix.store_transition(s,action,r,s_)
+            ExperienceBuffer=qmix.store_transition(s,action,r,s_,ExperienceBuffer)
             if qmix.memory_counter > MEMORY_CAPACITY:
-                qmix.learn()
+                qmix.learn(train_step=i_step)
     return
 
 if __name__== "__main__":
     DQN_Training(True)
     #绘图表现视野
-    #DQN 115-119行可能是问题所在
+    #改choose_action()，不会选择已到终点的agent做动作
+    #试试加上unsqueeze训练
