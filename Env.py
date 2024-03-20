@@ -180,7 +180,7 @@ class MAPFEnv(gym.Env):
 
         #动作空间简化为离散的N个方向，每次只有一个智能体移动
         # self.action_space=spaces.Box(low=0,high=NUM_DIRECTIONS-1,shape=(1,self.num_agent),dtype=np.int64)
-        self.action_space=spaces.Tuple([spaces.Discrete(self.num_agent), spaces.Discrete(NUM_DIRECTIONS)])
+        self.action_space=spaces.Discrete(self.num_agent*NUM_DIRECTIONS)
 
         #观察空间为智能体的二维位置，即2*N的nparray
         # self.observation_space=spaces.Discrete(self.num_agent)
@@ -188,7 +188,8 @@ class MAPFEnv(gym.Env):
         #初始化地图
         self.state=State(self.num_agent,self.len_edge)
 
-    def step(self,action):
+    def step(self,index):
+        action=tuple([int(index/NUM_DIRECTIONS),int(index%NUM_DIRECTIONS)])
         info = []
         #接受动作，返回状态，奖励，done，info，action为(agent_id,direction)
         if action[0] in self.agent_id:

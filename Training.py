@@ -1,9 +1,12 @@
+import numpy as np
+
 import DQN
 import Env
 import os
 import QMIX
+import utils
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
-
+from QMIX import N_STATES
 MEMORY_CAPACITY=2000  #经验回放池大小
 
 
@@ -52,21 +55,33 @@ def DQN_Training(check_point=False,PATH='./checkpoints/checkpoint_DQN_3agent_3ob
 
 
 def QMIX_Training(check_point=False,Path=None):
+    #初始化经验回放池
+    e_rpm = utils.EpisodeMemory(episode_size=10, num_step=2000)
+    rpm = utils.ReplayMemory(e_rpm)
+    # ExperienceBuffer={'s':np.zeros((MEMORY_CAPACITY,N_STATES)),'a':np.zeros((MEMORY_CAPACITY,1)),'r':np.zeros((MEMORY_CAPACITY,1)),'s_':np.zeros((MEMORY_CAPACITY,N_STATES))}
     qmix=QMIX.QMIX()
     env = Env.MAPFEnv()
     ExperienceBuffer=[]
     for i_episode in range(400):
         s=env.reset()
         for i_step in range(1000):
+            s=s.reshape(1,1,N_STATES)
             action=qmix.choose_action(s,env=env)
-            s_,r,done,info=env.step(action)
-            ExperienceBuffer=qmix.store_transition(s,action,r,s_,ExperienceBuffer)
-            if qmix.memory_counter > MEMORY_CAPACITY:
-                qmix.learn(train_step=i_step)
+            s_, r, done, info = env.step(action)
+            if i_step==999:
+                done=True
+            rpm.append((s, action, r, s_, done),done)   #搜集数据
+            s = s_
+            if done:
+                break
+
+        if len(e_rpm) > MEMORY_CAPACITY:
+            qmix.learn(buffer=e_rpm,train_step=i_step)
     return
 
 if __name__== "__main__":
-    DQN_Training(True)
+    # DQN_Training(True)
+    QMIX_Training()
     #绘图表现视野
     #改choose_action()，不会选择已到终点的agent做动作
     #试试加上unsqueeze训练

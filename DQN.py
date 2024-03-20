@@ -69,15 +69,13 @@ class DQNet(object):
     def  choose_action(self, x,env):
         #实现epsilon greedy方法，接受当前状态，环境，返回动作
         
-        # x=torch.unsqueeze(torch.FloatTensor(x), 0).to(device) #为输入状态x增加一个维度
-        x=torch.FloatTensor(x).to(device)
+        x=torch.unsqueeze(torch.FloatTensor(x), 0).to(device) #为输入状态x增加一个维度
+        # x=torch.FloatTensor(x).to(device)
         #只输入一个样本
         if np.random.uniform() < EPSILON:   # 贪心
             #动作空间中每个动作的Q值，选最大
             actions_value=self.eval_net.forward(x)
-            Index=torch.max(actions_value, 1)[1].cpu().numpy()
-            #动作空间的序号转动作向量
-            action=tuple([int(Index/NUM_DIRECTIONS),int(Index%NUM_DIRECTIONS)])
+            action=torch.max(actions_value, 1)[1].cpu().numpy()
         else:   #随机
             action=env.action_space.sample()
         return action
@@ -107,8 +105,8 @@ class DQNet(object):
         #提取向量或矩阵s,a,r,s_，并将其转换为torch变量
         b_s=torch.FloatTensor(b_memory[:, :N_STATES]).to(device)
         #将数据放到GPU上
-        b_a=torch.LongTensor(b_memory[:, N_STATES:N_STATES+2].astype(int)).to(device)
-        b_r=torch.FloatTensor(b_memory[:, N_STATES+2:N_STATES+3]).to(device)
+        b_a=torch.LongTensor(b_memory[:, N_STATES:N_STATES+1].astype(int)).to(device)
+        b_r=torch.FloatTensor(b_memory[:, N_STATES+1:N_STATES+2]).to(device)
         b_s_=torch.FloatTensor(b_memory[:, -N_STATES:]).to(device)
 
         #动作转index， b_a：batch*2
