@@ -6,22 +6,25 @@ import numpy as np
 from Env import NUM_OBSTACLE,NUM_AGENTS,NUM_DIRECTIONS,OBSERVATION_SIZE
 N_ACTIONS=NUM_DIRECTIONS*NUM_AGENTS    #动作空间大小
 N_STATES=NUM_AGENTS*(4+2*OBSERVATION_SIZE)   #状态空间大小
-GAMMA=0.9
+GAMMA=0.9         #衰减因子
+LR=0.01           #学习率
+EPSILON=0.9       #epsilon greedy方法
 TARGET_NETWORK_UPDATE_FREQ=100
 #网络大小参数
 HYPER_HIDDEN_DIM=40
 QMIX_HIDDEN_DIM=40
 RNN_HIDDEN_STATE=40
+INPUT_SHAPE=N_STATES+N_ACTIONS+NUM_AGENTS
 
 device=torch.device('cuda:0')
 
 class RNN(nn.Module):
     #输出q：(-1，N_ACTIONS)   h：(-1,rnn_hidden_dim)
     # 所有 Agent 共享同一网络, 因此 input_shape = obs_shape + n_actions + n_agents（one_hot_code）
-    def __init__(self, input_shape):
+    def __init__(self):
         super().__init__()
         self.rnn_hidden_dim=RNN_HIDDEN_STATE
-        self.fc1 = nn.Linear(input_shape, self.rnn_hidden_dim)
+        self.fc1 = nn.Linear(INPUT_SHAPE, self.rnn_hidden_dim)
         self.fc1.weight.data.normal_(0, 0.1)  # 初始化
         self.rnn = nn.GRUCell(self.rnn_hidden_dim, self.rnn_hidden_dim)     # GRUCell(input_size, hidden_size)
         self.fc2 = nn.Linear(self.rnn_hidden_dim, N_ACTIONS)
@@ -91,20 +94,19 @@ class MIXNet(nn.Module):
 
 class QMIX(nn.Module):
 
-    def __init__(self, arglist):
+    def __init__(self):
         super().__init__()
-        self.arglist = arglist
-        self.memory_counter = 0  # 经验回放计数器
         self.eval_rnn,self.target_rnn=RNN().to(device),RNN().to(device)#初始化agent网络
-        self.target_mix_net,self.eval_mix_net=MIXNet().to(device),MIXNet.to(device)
-        self.optimizer=torch.optim.Adam()
+        self.target_mix_net,self.eval_mix_net=MIXNet().to(device),MIXNet().to(device)
+        self.eval_parameters = list(self.eval_mix_net.parameters()) + list(self.eval_rnn.parameters())
+        self.optimizer=torch.optim.Adam(self.eval_parameters,lr=LR)
         self.loss_func=nn.MSELoss().to(device)
 
         #保存隐藏层参数
         self.eval_hidden=np.zeros((NUM_AGENTS,RNN_HIDDEN_STATE))
 
 
-    def choose_action(self, obs, last_action, agent_num, avail_actions, epsilon, env,maven_z=None, evaluate=False):
+    def choose_action(self, obs, env,agent_id):
         inputs = obs.copy()
         # avail_actions_ind = np.nonzero(avail_actions)[0]  # index of actions which can be choose
 
@@ -117,27 +119,26 @@ class QMIX(nn.Module):
         # if self.args.reuse_network:
         #     inputs = np.hstack((inputs, agent_id))
 
-        hidden_state = self.eval_hidden[:, agent_num, :]
 
-        # transform the shape of inputs from (42,) to (1,42)
-        inputs = torch.tensor(inputs, dtype=torch.float32).unsqueeze(0)
-        avail_actions = torch.tensor(avail_actions, dtype=torch.float32).unsqueeze(0)
-
-        # if self.args.cuda:
-        #     inputs = inputs.cuda()
-        #     hidden_state = hidden_state.cuda()
-
-        # 计算Q值
-        q_value, self.eval_hidden[:, agent_num, :] = self.eval_rnn(inputs, hidden_state)
-
-        # choose action from q value
-        q_value[avail_actions == 0.0] = - float("inf")
-        if np.random.uniform() < epsilon:
+        if np.random.uniform() > EPSILON:
             action=env.action_space.sample()
         else:
-            Index = torch.argmax(q_value)
-            #动作空间的序号转动作向量
-            action=tuple([int(Index/NUM_DIRECTIONS),int(Index%NUM_DIRECTIONS)])
+            hidden_state = self.eval_hidden[agent_id, :]
+
+            # transform the shape of inputs from (42,) to (1,42)
+            inputs = torch.tensor(inputs, dtype=torch.float32).unsqueeze(0)
+            # avail_actions = torch.tensor(avail_actions, dtype=torch.float32).unsqueeze(0)
+
+            # if self.args.cuda:
+            #     inputs = inputs.cuda()
+            #     hidden_state = hidden_state.cuda()
+
+            # 计算Q值
+            q_value, self.eval_hidden[agent_id, :] = self.eval_rnn(inputs, hidden_state)
+
+            # choose action from q value
+            # q_value[avail_actions == 0.0] = - float("inf")
+            action = torch.argmax(q_value)
         return action
 
 

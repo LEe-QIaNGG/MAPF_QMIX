@@ -65,7 +65,8 @@ def QMIX_Training(check_point=False,Path=None):
         s=env.reset()
         for i_step in range(1000):
             s=s.reshape(1,1,N_STATES)
-            action=qmix.choose_action(s,env=env)
+            for i in env.agent_id:
+                action=qmix.choose_action(s,env=env,agent_id=i)
             s_, r, done, info = env.step(action)
             if i_step==999:
                 done=True
@@ -76,6 +77,7 @@ def QMIX_Training(check_point=False,Path=None):
 
         if len(e_rpm) > MEMORY_CAPACITY:
             qmix.learn(buffer=e_rpm,train_step=i_step)
+    env.close()
     return
 
 if __name__== "__main__":
