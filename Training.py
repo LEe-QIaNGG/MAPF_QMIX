@@ -61,7 +61,6 @@ def QMIX_Training(check_point=False,Path=None):
     # ExperienceBuffer={'s':np.zeros((MEMORY_CAPACITY,N_STATES)),'a':np.zeros((MEMORY_CAPACITY,1)),'r':np.zeros((MEMORY_CAPACITY,1)),'s_':np.zeros((MEMORY_CAPACITY,N_STATES))}
     qmix=QMIX.QMIX()
     env = Env.MAPFEnv()
-    ExperienceBuffer=[]
     for i_episode in range(400):
         s=env.reset()
         for i_step in range(1000):
