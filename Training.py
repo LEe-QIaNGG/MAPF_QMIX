@@ -60,13 +60,14 @@ def QMIX_Training(check_point=False,Path=None):
     rpm = utils.ReplayMemory(e_rpm)
     # ExperienceBuffer={'s':np.zeros((MEMORY_CAPACITY,N_STATES)),'a':np.zeros((MEMORY_CAPACITY,1)),'r':np.zeros((MEMORY_CAPACITY,1)),'s_':np.zeros((MEMORY_CAPACITY,N_STATES))}
     qmix=QMIX.QMIX()
-    env = Env.MAPFEnv()
+    env = Env.MAPFEnv('DTDE')
     for i_episode in range(400):
         s=env.reset()
         for i_step in range(1000):
-            s=s.reshape(1,1,N_STATES)
+            action = []
             for i in env.agent_id:
-                action=qmix.choose_action(s,env=env,agent_id=i)
+                a=qmix.choose_action(s,env=env,agent_id=i)
+                action.append(a)
             s_, r, done, info = env.step(action)
             if i_step==999:
                 done=True

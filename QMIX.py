@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 
 from Env import NUM_OBSTACLE,NUM_AGENTS,NUM_DIRECTIONS,OBSERVATION_SIZE
-N_ACTIONS=NUM_DIRECTIONS*NUM_AGENTS    #动作空间大小
+N_ACTIONS=NUM_DIRECTIONS    #动作空间大小
 N_STATES=NUM_AGENTS*(4+2*OBSERVATION_SIZE)   #状态空间大小
 GAMMA=0.9         #衰减因子
 LR=0.01           #学习率
@@ -14,7 +14,7 @@ TARGET_NETWORK_UPDATE_FREQ=100
 HYPER_HIDDEN_DIM=40
 QMIX_HIDDEN_DIM=40
 RNN_HIDDEN_STATE=40
-INPUT_SHAPE=N_STATES+N_ACTIONS+NUM_AGENTS
+INPUT_SHAPE=5+2*OBSERVATION_SIZE    #CETE的state取id号，在加上id
 
 device=torch.device('cuda:0')
 
@@ -106,8 +106,8 @@ class QMIX(nn.Module):
         self.eval_hidden=np.zeros((NUM_AGENTS,RNN_HIDDEN_STATE))
 
 
-    def choose_action(self, obs, env,agent_id):
-        inputs = obs.copy()
+    def choose_action(self, state, env,agent_id):
+
         # avail_actions_ind = np.nonzero(avail_actions)[0]  # index of actions which can be choose
 
         # # transform agent_num to onehot vector
@@ -123,10 +123,15 @@ class QMIX(nn.Module):
         if np.random.uniform() > EPSILON:
             action=env.action_space.sample()
         else:
-            hidden_state = self.eval_hidden[agent_id, :]
+            hidden_state = self.eval_hidden[agent_id, :].reshape(-1,RNN_HIDDEN_STATE)
+            hidden_state=torch.tensor(hidden_state, dtype=torch.float32).to(device)
+            # 输入的state是完整state，要取出id号智能体的部分观察
+            inputs = state[agent_id].copy()
 
             # transform the shape of inputs from (42,) to (1,42)
-            inputs = torch.tensor(inputs, dtype=torch.float32).unsqueeze(0)
+            inputs = torch.tensor(inputs, dtype=torch.float32).unsqueeze(0).to(device)
+
+            inputs=torch.cat([torch.tensor(agent_id).reshape(1,1).to(device),inputs.reshape(1,-1)],dim=1)
             # avail_actions = torch.tensor(avail_actions, dtype=torch.float32).unsqueeze(0)
 
             # if self.args.cuda:
@@ -134,11 +139,11 @@ class QMIX(nn.Module):
             #     hidden_state = hidden_state.cuda()
 
             # 计算Q值
-            q_value, self.eval_hidden[agent_id, :] = self.eval_rnn(inputs, hidden_state)
-
+            q_value,  h= self.eval_rnn(inputs, hidden_state)
+            self.eval_hidden[agent_id, :]=h.cpu().detach().numpy()
             # choose action from q value
             # q_value[avail_actions == 0.0] = - float("inf")
-            action = torch.argmax(q_value)
+            action = torch.argmax(q_value).cpu().detach().item()
         return action
 
 

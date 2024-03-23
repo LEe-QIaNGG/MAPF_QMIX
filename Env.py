@@ -45,7 +45,6 @@ class State():
 
     def move_agents(self,action):
         #更新位置，若远离goal返回cost，靠近返回0
-        
         pos=self.map[action[0],0:2]  #当前智能体的二维坐标
         goal=self.map[action[0],2:4]  #当前智能体终点坐标
         change=STEP_LEN*np.stack([np.cos(action[1]*2*np.pi/NUM_DIRECTIONS),np.sin(action[1]*2*np.pi/NUM_DIRECTIONS)]).reshape(-1,2)
@@ -172,15 +171,23 @@ class State():
 
 class MAPFEnv(gym.Env):
     metadata = {'render.modes':['human','rgb_array'],'video.frames_per_second': 2}
-    def  __init__(self):
+    def  __init__(self,mode):
+        #mode值：CTCE或DTDE
         self.num_agent=NUM_AGENTS
         self.agent_id=list(range(self.num_agent))
         self.len_edge=MAP_WIDTH
+        assert mode=='DTDE' or mode=='CTCE'
+        self.mode=mode
+        #画布
         self.viewer = rendering.Viewer(SCREEN_WIDTH*2, SCREEN_WIDTH*2)
 
         #动作空间简化为离散的N个方向，每次只有一个智能体移动
         # self.action_space=spaces.Box(low=0,high=NUM_DIRECTIONS-1,shape=(1,self.num_agent),dtype=np.int64)
-        self.action_space=spaces.Discrete(self.num_agent*NUM_DIRECTIONS)
+        if mode=='CTEE':
+            self.action_space = spaces.Discrete(self.num_agent * NUM_DIRECTIONS)
+        elif mode=='DTDE':
+            #在step前将拼接好的action传进去
+            self.action_space = spaces.Discrete(NUM_DIRECTIONS)
 
         #观察空间为智能体的二维位置，即2*N的nparray
         # self.observation_space=spaces.Discrete(self.num_agent)
@@ -189,39 +196,29 @@ class MAPFEnv(gym.Env):
         self.state=State(self.num_agent,self.len_edge)
 
     def step(self,index):
-        action=tuple([int(index/NUM_DIRECTIONS),int(index%NUM_DIRECTIONS)])
-        info = []
-        #接受动作，返回状态，奖励，done，info，action为(agent_id,direction)
-        if action[0] in self.agent_id:
-            away_cost=self.state.move_agents(action)
-            #获取奖励，判断是否到终点
-            Reward,id=self.state.eval(action[0])
-            Reward=Reward+away_cost
-            if id==-1:
-                #智能体到达终点，活动智能体索引中删除该编号
-                self.agent_id.remove(action[0])
-                self.state.direction_mat[action[0]]=np.ones(OBSERVATION_SIZE*2)*-1
-                observation=np.concatenate((self.state.map, self.state.direction_mat),axis=1)
-                info=[action[0],'智能体到达终点']
-            else:
-                info = [action[0], '智能体移动','away_cost:',away_cost]
-                #没有到达终点的话，更新智能体周围智能体和障碍信息
-                observation=self.state.observe(action[0])
-        else:
-            #该智能体已到终点，无需做动作
-            info = [action[0], '智能体已在终点']
-            observation = self.state.observation
-            Reward=ACTION_COST
-        
+        if self.mode=='CTCE':   #这种情况参数为空间为num_agent * NUM_DIRECTIONS的一个数值
+            #返回的是一个agent做动作后的s，r，done，info
+            action=tuple([int(index/NUM_DIRECTIONS),int(index%NUM_DIRECTIONS)])
+            observation,Reward,done,info=self.step_single_agent(action)
 
+        elif self.mode=='DTDE':   #这种情况参数为shape n*1的向量，第二位空间为n direction
+            n=len(index)
+            observation,Reward,Info=[],[],[]
+            for id,direction in enumerate(index):
+                action=[id,direction]
+                o,r,done,info=self.step_single_agent(action)
+                observation=np.concatenate((observation,o[id]))
+                Reward=np.concatenate((Reward,r))
+                Info.append(info)
+                if done:
+                    if id!=n-1:
+                        # 填充至形状一样
+                        observation=np.concatenate((observation,np.zeros((n-id-1)*(5+2*OBSERVATION_SIZE))))
+                        Reward = np.concatenate((Reward, np.zeros(n-id-1)))
+                    break
 
-        if self.agent_id==[]:
-            Reward=Reward+FINISH_REWARD
-            done=True
-        else:
-            done=False
+        return observation.reshape(n,-1),Reward,done,Info
 
-        return observation,Reward,done,info
 
     def reset(self):
         # self.viewer = rendering.Viewer(SCREEN_WIDTH*3, SCREEN_WIDTH*3)
@@ -255,6 +252,38 @@ class MAPFEnv(gym.Env):
     def close(self):
         self.viewer.close()
 
+    def step_single_agent(self,action):
+        #action: (id,direction)
+        info = []
+        # 接受动作，返回状态，奖励，done，info，action为(agent_id,direction)
+        if action[0] in self.agent_id:
+            away_cost = self.state.move_agents(action)
+            # 获取奖励，判断是否到终点
+            Reward, id = self.state.eval(action[0])
+            Reward = Reward + away_cost
+            if id == -1:
+                # 智能体到达终点，活动智能体索引中删除该编号
+                self.agent_id.remove(action[0])
+                self.state.direction_mat[action[0]] = np.ones(OBSERVATION_SIZE * 2) * -1
+                observation = np.concatenate((self.state.map, self.state.direction_mat), axis=1)
+                info = [action[0], '智能体到达终点']
+            else:
+                info = [action[0], '智能体移动', 'away_cost:', away_cost]
+                # 没有到达终点的话，更新智能体周围智能体和障碍信息
+                observation = self.state.observe(action[0])
+        else:
+            # 该智能体已到终点，无需做动作
+            info = [action[0], '智能体已在终点']
+            observation = self.state.observation
+            Reward = ACTION_COST
+
+        if self.agent_id == []:
+            Reward = Reward + FINISH_REWARD
+            done = True
+        else:
+            done = False
+
+        return observation, Reward, done, info
 
 if __name__== "__main__":
     env=MAPFEnv()
