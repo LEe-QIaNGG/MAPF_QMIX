@@ -80,7 +80,7 @@ def QMIX_Training(load_rpm=False,check_point=False,Path=None):
                 qmix.learn(buffer=e_rpm, train_step=i_step)
 
             action = []
-            for i in env.agent_id:
+            for i in range(env.num_agent):
                 a=qmix.choose_action(s,env=env,agent_id=i)
                 action.append(a)
             s_, r, done, info = env.step(action)

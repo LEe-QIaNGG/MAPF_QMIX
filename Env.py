@@ -203,18 +203,17 @@ class MAPFEnv(gym.Env):
 
         elif self.mode=='DTDE':   #这种情况参数为shape n*1的向量，第二位空间为n direction
             n=len(index)
-            observation,Reward,Info=[],[],[]
+            observation,Reward,Info=[],0,[]
             for id,direction in enumerate(index):
                 action=[id,direction]
                 o,r,done,info=self.step_single_agent(action)
                 observation=np.concatenate((observation,o[id]))
-                Reward.append(r)
+                Reward=Reward+r
                 Info.append(info)
                 if done:
                     if id!=n-1:
                         # 填充至形状一样
                         observation=np.concatenate((observation,np.zeros((NUM_AGENTS-id-1)*(5+2*OBSERVATION_SIZE))))
-                        Reward = np.concatenate((np.array(Reward), np.zeros(NUM_AGENTS-id-1)))
                     break
 
             return observation.reshape(NUM_AGENTS,-1),Reward,done,Info
