@@ -60,7 +60,7 @@ class DQNet(object):
         else:
             self.memory_counter=0 #经验回放计数器
             #经验回放池 （s, a, r, s_）
-            self.memory=np.zeros((MEMORY_CAPACITY, N_STATES * 2 + 3)) #r:1*1 a:1*2
+            self.memory=np.zeros((MEMORY_CAPACITY, N_STATES * 2 + 2)) #r:1*1 a:1*1
 
 
 
@@ -109,11 +109,11 @@ class DQNet(object):
         b_r=torch.FloatTensor(b_memory[:, N_STATES+1:N_STATES+2]).to(device)
         b_s_=torch.FloatTensor(b_memory[:, -N_STATES:]).to(device)
 
-        #动作转index， b_a：batch*2
-        Index=b_a[:,0]*NUM_DIRECTIONS+b_a[:,1]
+        # #动作转index， b_a：batch*2
+        # Index=b_a[:,0]*NUM_DIRECTIONS+b_a[:,1]
 
         #Q函数计算
-        q_eval=self.eval_net(b_s).gather(1, Index.reshape(-1,1)) # Index:(batch_size, 1)      q_eval:(batch_size, 1)
+        q_eval=self.eval_net(b_s).gather(1, b_a.reshape(-1,1)) # Index:(batch_size, 1)      q_eval:(batch_size, 1)
 
         #下个状态的Q值
         q_next=self.target_net(b_s_).detach() 

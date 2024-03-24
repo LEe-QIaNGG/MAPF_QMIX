@@ -1,18 +1,18 @@
 import numpy as np
-
+import pickle
 import DQN
 import Env
 import os
 import QMIX
 import utils
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
-from QMIX import N_STATES
-MEMORY_CAPACITY=2000  #经验回放池大小
+from utils import NUM_STEP
+MEMORY_CAPACITY=20  #经验回放池大小
 
 
-def DQN_Training(check_point=False,PATH='./checkpoints/checkpoint_DQN_3agent_3obstacle_8directions_50000.pkl'):
+def DQN_Training(check_point=False,PATH='./checkpoints/checkpoint_DQN_3agent_3obstacle_8directions_7121.pkl'):
     dqn= DQN.DQNet(MEMORY_CAPACITY,check_point,PATH)
-    env=Env.MAPFEnv()
+    env=Env.MAPFEnv('CTCE')
 
     print("\nCollecting experience...")
     for i_episode in range(400):
@@ -41,7 +41,7 @@ def DQN_Training(check_point=False,PATH='./checkpoints/checkpoint_DQN_3agent_3ob
                     remaining_dist=env.state.get_remaining_dist()
                     print('Ep: ', i_episode,'step ',dqn.learn_step_counter,'agent_list',
                           env.agent_id,'remaining distance',remaining_dist,' Reward ',ep_r,end='\n')
-                    print(env.state.map,'\n',env.state.obstacle)
+                    # print(env.state.map,'\n',env.state.obstacle)
                     if remaining_dist>200 or dqn.learn_step_counter>40000:
                         done=True
             if done:
@@ -54,36 +54,50 @@ def DQN_Training(check_point=False,PATH='./checkpoints/checkpoint_DQN_3agent_3ob
     env.close()
 
 
-def QMIX_Training(check_point=False,Path=None):
+def QMIX_Training(load_rpm=False,check_point=False,Path=None):
     #初始化经验回放池
-    e_rpm = utils.EpisodeMemory(episode_size=10, num_step=2000)
+    e_rpm = utils.EpisodeMemory(num_episode=MEMORY_CAPACITY)
     rpm = utils.ReplayMemory(e_rpm)
+    if load_rpm:
+        with open("./rpm/rpm.pickle", "rb") as file:
+            rpm = pickle.load(file)
+        with open("./rpm/e_rpm.pickle", "rb") as file:
+            e_rpm = pickle.load(file)
     # ExperienceBuffer={'s':np.zeros((MEMORY_CAPACITY,N_STATES)),'a':np.zeros((MEMORY_CAPACITY,1)),'r':np.zeros((MEMORY_CAPACITY,1)),'s_':np.zeros((MEMORY_CAPACITY,N_STATES))}
     qmix=QMIX.QMIX()
     env = Env.MAPFEnv('DTDE')
     for i_episode in range(400):
+        print('episode: ',i_episode,end='\n')
         s=env.reset()
-        for i_step in range(1000):
+        s=env.add_index(s)
+        for i_step in range(NUM_STEP):
+
+            if len(e_rpm) >= MEMORY_CAPACITY:
+                with open("./rpm/rpm.pickle", "wb") as file:
+                    pickle.dump(rpm, file)
+                with open("./rpm/e_rpm.pickle", "wb") as file:
+                    pickle.dump(e_rpm, file)
+                qmix.learn(buffer=e_rpm, train_step=i_step)
+
             action = []
             for i in env.agent_id:
                 a=qmix.choose_action(s,env=env,agent_id=i)
                 action.append(a)
             s_, r, done, info = env.step(action)
-            if i_step==999:
+            s_=env.add_index(s_)
+            if i_step==499:
                 done=True
             rpm.append((s, action, r, s_, done),done)   #搜集数据
             s = s_
             if done:
                 break
 
-        if len(e_rpm) > MEMORY_CAPACITY:
-            qmix.learn(buffer=e_rpm,train_step=i_step)
     env.close()
     return
 
 if __name__== "__main__":
-    # DQN_Training(True)
-    QMIX_Training()
+    # DQN_Training(check_point=True)
+    QMIX_Training(load_rpm=True)
     #绘图表现视野
     #改choose_action()，不会选择已到终点的agent做动作
     #试试加上unsqueeze训练

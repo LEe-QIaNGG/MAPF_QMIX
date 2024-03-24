@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-
+from Training import MEMORY_CAPACITY
 from Env import NUM_OBSTACLE,NUM_AGENTS,NUM_DIRECTIONS,OBSERVATION_SIZE
 N_ACTIONS=NUM_DIRECTIONS    #动作空间大小
 N_STATES=NUM_AGENTS*(4+2*OBSERVATION_SIZE)   #状态空间大小
@@ -49,19 +49,19 @@ class MIXNet(nn.Module):
 
         # hyper_w1 网络用于输出推理网络中的第一层神经元所需的 weights，
         # 推理网络第一层需要 qmix_hidden * n_agents 个偏差值，因此 hyper_w1 网络输出维度为 qmix_hidden * n_agents
-        self.hyper_w1 = nn.Sequential(nn.Linear(N_STATES, HYPER_HIDDEN_DIM),
+        self.hyper_w1 = nn.Sequential(nn.Linear(INPUT_SHAPE, HYPER_HIDDEN_DIM),
                                       nn.ReLU(),
                                       nn.Linear(HYPER_HIDDEN_DIM, NUM_AGENTS * QMIX_HIDDEN_DIM))
 
         # hyper_w2 生成推理网络需要的从隐层到输出 Q 值的所有 weights，共 qmix_hidden 个
-        self.hyper_w2 = nn.Sequential(nn.Linear(N_STATES, HYPER_HIDDEN_DIM),
+        self.hyper_w2 = nn.Sequential(nn.Linear(INPUT_SHAPE, HYPER_HIDDEN_DIM),
                                       nn.ReLU(),
                                       nn.Linear(HYPER_HIDDEN_DIM, QMIX_HIDDEN_DIM))
 
         # hyper_b1 生成第一层网络对应维度的偏差 bias
-        self.hyper_b1 = nn.Linear(N_STATES, QMIX_HIDDEN_DIM)
+        self.hyper_b1 = nn.Linear(INPUT_SHAPE, QMIX_HIDDEN_DIM)
         # hyper_b2 生成对应从隐层到输出 Q 值层的 bias
-        self.hyper_b2 =nn.Sequential(nn.Linear(N_STATES, QMIX_HIDDEN_DIM),
+        self.hyper_b2 =nn.Sequential(nn.Linear(INPUT_SHAPE, QMIX_HIDDEN_DIM),
                                      nn.ReLU(),
                                      nn.Linear(QMIX_HIDDEN_DIM, 1)
                                      )
@@ -70,7 +70,7 @@ class MIXNet(nn.Module):
         # 传入的q_values是三维的，shape为(episode_num, max_episode_len， n_agents)
         episode_num = q_values.size(0)
         q_values = q_values.view(-1, 1, NUM_AGENTS)  # (episode_num * max_episode_len, 1, n_agents)
-        states = states.reshape(-1, N_STATES)  # (episode_num * max_episode_len, state_shape)
+        states = states.reshape(-1, INPUT_SHAPE)  # (episode_num * max_episode_len, state_shape)
 
         w1 = torch.abs(self.hyper_w1(states))
         b1 = self.hyper_b1(states)
@@ -103,7 +103,8 @@ class QMIX(nn.Module):
         self.loss_func=nn.MSELoss().to(device)
 
         #保存隐藏层参数
-        self.eval_hidden=np.zeros((NUM_AGENTS,RNN_HIDDEN_STATE))
+        self.eval_hidden=np.zeros((MEMORY_CAPACITY,NUM_AGENTS,RNN_HIDDEN_STATE))
+        self.target_hidden = np.zeros((MEMORY_CAPACITY,NUM_AGENTS, RNN_HIDDEN_STATE))
 
 
     def choose_action(self, state, env,agent_id):
@@ -123,7 +124,7 @@ class QMIX(nn.Module):
         if np.random.uniform() > EPSILON:
             action=env.action_space.sample()
         else:
-            hidden_state = self.eval_hidden[agent_id, :].reshape(-1,RNN_HIDDEN_STATE)
+            hidden_state = self.eval_hidden[-1:,agent_id, :].reshape(-1,RNN_HIDDEN_STATE)
             hidden_state=torch.tensor(hidden_state, dtype=torch.float32).to(device)
             # 输入的state是完整state，要取出id号智能体的部分观察
             inputs = state[agent_id].copy()
@@ -131,7 +132,8 @@ class QMIX(nn.Module):
             # transform the shape of inputs from (42,) to (1,42)
             inputs = torch.tensor(inputs, dtype=torch.float32).unsqueeze(0).to(device)
 
-            inputs=torch.cat([torch.tensor(agent_id).reshape(1,1).to(device),inputs.reshape(1,-1)],dim=1)
+            # inputs=torch.cat([torch.tensor(agent_id).reshape(1,1).to(device),inputs.reshape(1,-1)],dim=1)
+
             # avail_actions = torch.tensor(avail_actions, dtype=torch.float32).unsqueeze(0)
 
             # if self.args.cuda:
@@ -140,14 +142,14 @@ class QMIX(nn.Module):
 
             # 计算Q值
             q_value,  h= self.eval_rnn(inputs, hidden_state)
-            self.eval_hidden[agent_id, :]=h.cpu().detach().numpy()
+            self.eval_hidden[-1:agent_id, :]=h.cpu().detach().numpy()
             # choose action from q value
             # q_value[avail_actions == 0.0] = - float("inf")
             action = torch.argmax(q_value).cpu().detach().item()
         return action
 
 
-    def _get_inputs(self, buffer, transition_idx):
+    def _get_inputs(self, buffer, transition_idx,batch_size):
         # # 取出所有episode上该transition_idx的经验，u_onehot要取出所有，因为要用到上一条
         # obs, obs_next, u_onehot = batch['o'][:, transition_idx], batch['o_next'][:, transition_idx], batch['u_onehot'][:]
         # episode_num = obs.shape[0]
@@ -178,25 +180,26 @@ class QMIX(nn.Module):
             inputs_next.append(s)
         return inputs, inputs_next
 
-    def get_q_values(self, buffer ):
+    def get_q_values(self, buffer,batch_size):
         episode_num = len(buffer)
 
         q_evals, q_targets = [], []
         for transition_idx in range(buffer.num_step):
 
             # 先不慌给obs加last_action、agent_id
+
             #简单获取每个episode的transition_idx号记录，其中的s,s_
-            inputs, inputs_next = self._get_inputs(buffer, transition_idx)
+            inputs, inputs_next = self._get_inputs(buffer, transition_idx,batch_size)
 
-            inputs = inputs.cuda()
-            inputs_next = inputs_next.cuda()
-            self.eval_hidden = self.eval_hidden.cuda()
-            self.target_hidden = self.target_hidden.cuda()
+            inputs = torch.tensor(np.array(inputs), dtype=torch.float32).cuda()
+            inputs_next = torch.tensor(np.array(inputs_next), dtype=torch.float32).cuda()
 
-            q_eval, self.eval_hidden = self.eval_rnn(inputs, self.eval_hidden)  # inputs维度为(40,96)，得到的q_eval维度为(40,n_actions)
-            q_target, self.target_hidden = self.target_rnn(inputs_next, self.target_hidden)
+            eval_hidden = torch.tensor(self.eval_hidden, dtype=torch.float32).cuda()
+            target_hidden = torch.tensor(self.target_hidden, dtype=torch.float32).cuda()
 
-            # 把q_eval维度重新变回(8, 5,n_actions)
+            q_eval, eval_hidden = self.eval_rnn(inputs.reshape(-1,INPUT_SHAPE), eval_hidden)
+            q_target, target_hidden = self.target_rnn(inputs_next.reshape(-1,INPUT_SHAPE), target_hidden)
+
             q_eval = q_eval.view(episode_num, NUM_AGENTS, -1)
             q_target = q_target.view(episode_num, NUM_AGENTS, -1)
             q_evals.append(q_eval)
@@ -208,21 +211,21 @@ class QMIX(nn.Module):
         return q_evals, q_targets
 
     def learn(self,buffer, train_step, epsilon=None):  # train_step表示是第几次学习，用来控制更新target_net网络的参数
-        #初始化rnn
-        self.init_hidden()
-        batch_size=128
+        # #初始化rnn
+        # self.init_hidden()
+        batch_size=8
 
         batch_s, batch_action, batch_r, batch_s_,batch_done=buffer.sample(batch_size)
 
         # mask = 1 - batch["padded"].float()  # 用来把那些填充的经验的TD-error置0，从而不让它们影响到学习
 
         # 得到每个agent对应的Q值，维度为(episode个数，max_episode_len， n_agents，n_actions)
-        q_evals, q_targets = self.get_q_values(buffer)
+        q_evals, q_targets = self.get_q_values(buffer,batch_size)
 
-        batch_s = batch_s.cuda()
-        batch_r = batch_r.cuda()
-        batch_s_ = batch_s_.cuda()
-        batch_done = batch_done.cuda()
+        batch_s = torch.tensor(batch_s, dtype=torch.float32).cuda()
+        batch_r = torch.tensor(batch_r, dtype=torch.float32).cuda()
+        batch_s_ = torch.tensor(batch_s_, dtype=torch.float32).cuda()
+        batch_done = torch.tensor(batch_done, dtype=torch.float32).cuda()
 
         # 取每个agent动作对应的Q值，并且把最后不需要的一维去掉，因为最后一维只有一个值了
         # q_evals = torch.gather(q_evals, dim=3, index=u).squeeze(3)

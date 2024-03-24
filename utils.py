@@ -1,28 +1,31 @@
 import collections
 import random
 import numpy as np
+NUM_STEP=500
 
 class EpisodeMemory(object):
-    def __init__(self,episode_size,num_step):
-        self.buffer = collections.deque(maxlen=episode_size)
-        self.num_step=num_step   #时间步长
+    def __init__(self,num_episode):
+        self.num_episode=num_episode
+        self.buffer = collections.deque(maxlen=num_episode)
+        self.num_step=NUM_STEP   #时间步长
 
     def put(self,episode):
         self.buffer.append(episode)
 
     def sample(self,batch_size):
-        mini_batch = random.sample(self.buffer, batch_size)  #返回值是个列表
+
+        index = random.sample(range(self.num_episode), batch_size)  #返回值是个列表
         obs_batch, action_batch, reward_batch, next_obs_batch, done_batch = [], [], [], [], []
 
-        for experience in mini_batch:
-            self.num_step = min(self.num_step, len(experience)) #防止序列长度小于预定义长度
+        # for experience in mini_batch:
+        #     self.num_step = min(self.num_step, len(experience)) #防止序列长度小于预定义长度
 
-        for experience in mini_batch:
+        for i in index:
             idx = np.random.randint(0, len(experience)-self.num_step+1)  #随机选取一个时间步的id
             s, a, r, s_p, done = [],[],[],[],[]
             for i in range(idx,idx+self.num_step):
                 e1,e2,e3,e4,e5=experience[i][0]
-                s.append(e1[0][0]),a.append(e2),r.append(e3),s_p.append(e4),done.append(e5)
+                s.append(e1),a.append(e2),r.append(e3),s_p.append(e4),done.append(e5)
             obs_batch.append(s)
             action_batch.append(a)
             reward_batch.append(r)

@@ -178,12 +178,11 @@ class MAPFEnv(gym.Env):
         self.len_edge=MAP_WIDTH
         assert mode=='DTDE' or mode=='CTCE'
         self.mode=mode
-        #画布
-        self.viewer = rendering.Viewer(SCREEN_WIDTH*2, SCREEN_WIDTH*2)
+
 
         #动作空间简化为离散的N个方向，每次只有一个智能体移动
         # self.action_space=spaces.Box(low=0,high=NUM_DIRECTIONS-1,shape=(1,self.num_agent),dtype=np.int64)
-        if mode=='CTEE':
+        if mode=='CTCE':
             self.action_space = spaces.Discrete(self.num_agent * NUM_DIRECTIONS)
         elif mode=='DTDE':
             #在step前将拼接好的action传进去
@@ -200,6 +199,7 @@ class MAPFEnv(gym.Env):
             #返回的是一个agent做动作后的s，r，done，info
             action=tuple([int(index/NUM_DIRECTIONS),int(index%NUM_DIRECTIONS)])
             observation,Reward,done,info=self.step_single_agent(action)
+            return observation, Reward, done, info
 
         elif self.mode=='DTDE':   #这种情况参数为shape n*1的向量，第二位空间为n direction
             n=len(index)
@@ -208,16 +208,16 @@ class MAPFEnv(gym.Env):
                 action=[id,direction]
                 o,r,done,info=self.step_single_agent(action)
                 observation=np.concatenate((observation,o[id]))
-                Reward=np.concatenate((Reward,r))
+                Reward.append(r)
                 Info.append(info)
                 if done:
                     if id!=n-1:
                         # 填充至形状一样
-                        observation=np.concatenate((observation,np.zeros((n-id-1)*(5+2*OBSERVATION_SIZE))))
-                        Reward = np.concatenate((Reward, np.zeros(n-id-1)))
+                        observation=np.concatenate((observation,np.zeros((NUM_AGENTS-id-1)*(5+2*OBSERVATION_SIZE))))
+                        Reward = np.concatenate((np.array(Reward), np.zeros(NUM_AGENTS-id-1)))
                     break
 
-        return observation.reshape(n,-1),Reward,done,Info
+            return observation.reshape(NUM_AGENTS,-1),Reward,done,Info
 
 
     def reset(self):
@@ -227,6 +227,9 @@ class MAPFEnv(gym.Env):
         return self.state.observation
     
     def render(self,mode='human'):
+        #画布
+        self.viewer = rendering.Viewer(SCREEN_WIDTH*2, SCREEN_WIDTH*2)
+
         #画障碍
         for o in self.state.obstacle:
             self.viewer.draw_circle(
@@ -284,6 +287,12 @@ class MAPFEnv(gym.Env):
             done = False
 
         return observation, Reward, done, info
+
+    def add_index(self,state):
+        #给DTDE的状态加id index
+        index=np.array(range(NUM_AGENTS)).reshape(NUM_AGENTS,-1)
+        state=np.concatenate((index,state),axis=1)
+        return state
 
 if __name__== "__main__":
     env=MAPFEnv()
