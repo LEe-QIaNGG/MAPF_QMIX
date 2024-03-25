@@ -2,9 +2,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+
 from Training import MEMORY_CAPACITY
 from Env import NUM_OBSTACLE,NUM_AGENTS,NUM_DIRECTIONS,OBSERVATION_SIZE
 from utils import NUM_STEP
+
 N_ACTIONS=NUM_DIRECTIONS    #动作空间大小
 N_STATES=NUM_AGENTS*(4+2*OBSERVATION_SIZE)   #状态空间大小
 GAMMA=0.9         #衰减因子
@@ -107,6 +109,7 @@ class QMIX(nn.Module):
         #保存隐藏层参数
         self.eval_hidden=np.zeros((MEMORY_CAPACITY,NUM_AGENTS,RNN_HIDDEN_STATE))
         self.target_hidden = np.zeros((MEMORY_CAPACITY,NUM_AGENTS, RNN_HIDDEN_STATE))
+        self.loss=[]
 
 
     def choose_action(self, state, env,agent_id):
@@ -252,6 +255,7 @@ class QMIX(nn.Module):
         self.optimizer.zero_grad()
         loss.backward()
         print('loss: ',loss.item(),end='\n')
+        self.loss.append(loss.item())
         #梯度截断
         # torch.nn.utils.clip_grad_norm_(self.eval_parameters, self.args.grad_norm_clip)
         self.optimizer.step()

@@ -5,6 +5,8 @@ import Env
 import os
 import QMIX
 import utils
+import matplotlib.pyplot as plt
+
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 from utils import NUM_STEP
 MEMORY_CAPACITY=20  #经验回放池大小
@@ -96,6 +98,10 @@ def QMIX_Training(load_rpm=False,check_point=False,Path=None):
             s = s_
             if done:
                 break
+
+        plt.title('Loss')
+        plt.plot(qmix.loss)
+        plt.show()
 
     env.close()
     return
