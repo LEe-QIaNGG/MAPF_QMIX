@@ -59,6 +59,7 @@ def QMIX_Training(load_rpm=False,check_point=False,Path=None):
     e_rpm = utils.EpisodeMemory(num_episode=MEMORY_CAPACITY)
     rpm = utils.ReplayMemory(e_rpm)
     if load_rpm:
+        #读取保存的经验
         with open("./rpm/rpm.pickle", "rb") as file:
             rpm = pickle.load(file)
         with open("./rpm/e_rpm.pickle", "rb") as file:
@@ -70,15 +71,18 @@ def QMIX_Training(load_rpm=False,check_point=False,Path=None):
         print('episode: ',i_episode,end='\n')
         s=env.reset()
         s=env.add_index(s)
-        for i_step in range(NUM_STEP):
 
-            if len(e_rpm) >= MEMORY_CAPACITY:
+        if len(e_rpm) >= MEMORY_CAPACITY:
+            #保存经验
                 with open("./rpm/rpm.pickle", "wb") as file:
                     pickle.dump(rpm, file)
                 with open("./rpm/e_rpm.pickle", "wb") as file:
                     pickle.dump(e_rpm, file)
-                qmix.learn(buffer=e_rpm, train_step=i_step)
+                qmix.learn(buffer=e_rpm, train_step=i_episode)
 
+        for i_step in range(NUM_STEP):
+            # env.render()
+            #收集经验
             action = []
             for i in range(env.num_agent):
                 a=qmix.choose_action(s,env=env,agent_id=i)
@@ -88,6 +92,7 @@ def QMIX_Training(load_rpm=False,check_point=False,Path=None):
             if i_step==499:
                 done=True
             rpm.append((s, action, r, s_, done),done)   #搜集数据
+
             s = s_
             if done:
                 break

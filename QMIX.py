@@ -251,6 +251,7 @@ class QMIX(nn.Module):
         loss=self.loss_func(q_total_eval.reshape(batch_size,NUM_STEP), targets.detach())
         self.optimizer.zero_grad()
         loss.backward()
+        print('loss: ',loss.item(),end='\n')
         #梯度截断
         # torch.nn.utils.clip_grad_norm_(self.eval_parameters, self.args.grad_norm_clip)
         self.optimizer.step()
