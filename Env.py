@@ -171,7 +171,7 @@ class State():
 
 class MAPFEnv(gym.Env):
     metadata = {'render.modes':['human','rgb_array'],'video.frames_per_second': 2}
-    def  __init__(self,mode):
+    def  __init__(self,mode,render=False):
         #mode值：CTCE或DTDE
         self.num_agent=NUM_AGENTS
         self.agent_id=list(range(self.num_agent))
@@ -190,9 +190,11 @@ class MAPFEnv(gym.Env):
 
         #观察空间为智能体的二维位置，即2*N的nparray
         # self.observation_space=spaces.Discrete(self.num_agent)
-
         #初始化地图
         self.state=State(self.num_agent,self.len_edge)
+        if render:
+            #画布
+            self.viewer = rendering.Viewer(SCREEN_WIDTH*2, SCREEN_WIDTH*2)
 
     def step(self,index):
         if self.mode=='CTCE':   #这种情况参数为空间为num_agent * NUM_DIRECTIONS的一个数值
@@ -226,8 +228,6 @@ class MAPFEnv(gym.Env):
         return self.state.observation
     
     def render(self,mode='human'):
-        #画布
-        self.viewer = rendering.Viewer(SCREEN_WIDTH*2, SCREEN_WIDTH*2)
 
         #画障碍
         for o in self.state.obstacle:

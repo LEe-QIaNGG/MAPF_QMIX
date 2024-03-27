@@ -130,7 +130,6 @@ class DQNet(object):
         return
 
     def save_checkpoint(self,path):
-
         #保存模型，状态字典
         path="{}/checkpoint_DQN_{}agent_{}obstacle_{}directions_{}.pkl".format(path,NUM_AGENTS,NUM_OBSTACLE,NUM_DIRECTIONS,self.learn_step_counter)
         torch.save({'eval_state_dict':self.eval_net.state_dict(),

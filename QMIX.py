@@ -98,18 +98,28 @@ class MIXNet(nn.Module):
 
 class QMIX(nn.Module):
 
-    def __init__(self):
+    def __init__(self,load_checkpoint=False,path=None):
         super().__init__()
-        self.eval_rnn,self.target_rnn=RNN().to(device),RNN().to(device)#初始化agent网络
-        self.target_mix_net,self.eval_mix_net=MIXNet().to(device),MIXNet().to(device)
+        self.eval_rnn, self.target_rnn = RNN().to(device), RNN().to(device)  # 初始化agent网络
+        self.target_mix_net, self.eval_mix_net = MIXNet().to(device), MIXNet().to(device)
         self.eval_parameters = list(self.eval_mix_net.parameters()) + list(self.eval_rnn.parameters())
         self.optimizer=torch.optim.Adam(self.eval_parameters,lr=LR)
         self.loss_func=nn.MSELoss().to(device)
+        self.loss = []
+        if load_checkpoint:
+            checkpoint = torch.load(path)
+            self.eval_rnn.load_state_dict(checkpoint['eval_rnn_dict'])
+            self.target_rnn.load_state_dict(checkpoint['target_rnn_dict'])
+            self.eval_mix_net.load_state_dict(checkpoint['eval_qmix_dict'])
+            self.target_mix_net.load_state_dict(checkpoint['target_qmix_dict'])
+            self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            self.eval_hidden=checkpoint['eval_hidden']
+            self.target_hidden=checkpoint['target_hidden']
+        else:
+            #保存隐藏层参数
+            self.eval_hidden=np.zeros((MEMORY_CAPACITY,NUM_AGENTS,RNN_HIDDEN_STATE))
+            self.target_hidden = np.zeros((MEMORY_CAPACITY,NUM_AGENTS, RNN_HIDDEN_STATE))
 
-        #保存隐藏层参数
-        self.eval_hidden=np.zeros((MEMORY_CAPACITY,NUM_AGENTS,RNN_HIDDEN_STATE))
-        self.target_hidden = np.zeros((MEMORY_CAPACITY,NUM_AGENTS, RNN_HIDDEN_STATE))
-        self.loss=[]
 
 
     def choose_action(self, state, env,agent_id):
@@ -222,7 +232,6 @@ class QMIX(nn.Module):
         batch_size=8
 
         batch_s, batch_action, batch_r, batch_s_,batch_done,sample_index=buffer.sample(batch_size)
-
         # mask = 1 - batch["padded"].float()  # 用来把那些填充的经验的TD-error置0，从而不让它们影响到学习
 
         # 得到每个agent对应的Q值，维度为(episode个数，max_episode_len， n_agents，n_actions)
@@ -263,3 +272,16 @@ class QMIX(nn.Module):
         if train_step > 0 and train_step % TARGET_NETWORK_UPDATE_FREQ == 0:
             self.target_rnn.load_state_dict(self.eval_rnn.state_dict())
             self.target_mix_net.load_state_dict(self.eval_mix_net.state_dict())
+
+    def save_checkpoint(self,path):
+        #保存模型，状态字典
+        path="{}/checkpoint_QMIX_{}agent_{}obstacle_{}directions.pkl".format(path,NUM_AGENTS,NUM_OBSTACLE,NUM_DIRECTIONS)
+        torch.save({'eval_rnn_dict':self.eval_rnn.state_dict(),
+                    'target_rnn_dict':self.target_rnn.state_dict(),
+                    'eval_qmix_dict':self.eval_mix_net.state_dict(),
+                    'target_qmix_dict':self.target_mix_net.state_dict(),
+                    'optimizer_state_dict':self.optimizer.state_dict(),
+                    'eval_hidden':self.eval_hidden,
+                    'target_hidden':self.target_hidden
+                    },path)
+        return

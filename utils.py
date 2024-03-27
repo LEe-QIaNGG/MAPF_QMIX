@@ -43,9 +43,6 @@ class EpisodeMemory(object):
         #将列表转换为数组并转换数据类型
         return obs_batch,action_batch,reward_batch,next_obs_batch,done_batch,index
 
-    #输出队列的长度
-    def __len__(self):
-        return len(self.buffer)
 
 class ReplayMemory(object):
     def __init__(self,e_rpm):

@@ -74,13 +74,18 @@ def QMIX_Training(load_rpm=False,check_point=False,Path=None):
         s=env.reset()
         s=env.add_index(s)
 
-        if len(e_rpm) >= MEMORY_CAPACITY:
+        if i_episode%10==0 and i_episode!=0:
+            qmix.save_checkpoint('./checkpoints')
+
+        if i_episode%5==0:
             #保存经验
-                with open("./rpm/rpm.pickle", "wb") as file:
-                    pickle.dump(rpm, file)
-                with open("./rpm/e_rpm.pickle", "wb") as file:
-                    pickle.dump(e_rpm, file)
-                qmix.learn(buffer=e_rpm, train_step=i_episode)
+            with open("./rpm/rpm.pickle", "wb") as file:
+                pickle.dump(rpm, file)
+            with open("./rpm/e_rpm.pickle", "wb") as file:
+                pickle.dump(e_rpm, file)
+
+        if len(e_rpm.buffer) >= MEMORY_CAPACITY:
+            qmix.learn(buffer=e_rpm, train_step=i_episode)
 
         for i_step in range(NUM_STEP):
             # env.render()
@@ -90,20 +95,23 @@ def QMIX_Training(load_rpm=False,check_point=False,Path=None):
                 a=qmix.choose_action(s,env=env,agent_id=i)
                 action.append(a)
             s_, r, done, info = env.step(action)
+            # print('info；',info)
             s_=env.add_index(s_)
             if i_step==499:
                 done=True
             rpm.append((s, action, r, s_, done),done)   #搜集数据
-
             s = s_
+
             if done:
                 break
-
-        plt.title('Loss')
+        plt.clf()  # 清除上一幅图像
+        plt.xlabel('episode', fontdict={"family": "Times New Roman", "size": 15})
+        plt.ylabel('loss', fontdict={"family": "Times New Roman", "size": 15})
         plt.plot(qmix.loss)
-        plt.show()
-
+        plt.pause(0.01)  # 暂停0.01秒
+        plt.ioff()  # 关闭画图的窗口
     env.close()
+
     return
 
 if __name__== "__main__":
