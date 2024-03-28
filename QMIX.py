@@ -11,7 +11,6 @@ N_ACTIONS=NUM_DIRECTIONS    #动作空间大小
 N_STATES=NUM_AGENTS*(4+2*OBSERVATION_SIZE)   #状态空间大小
 GAMMA=0.9         #衰减因子
 LR=0.01           #学习率
-EPSILON=0.9       #epsilon greedy方法
 TARGET_NETWORK_UPDATE_FREQ=100
 #网络大小参数
 HYPER_HIDDEN_DIM=40
@@ -122,7 +121,7 @@ class QMIX(nn.Module):
 
 
 
-    def choose_action(self, state, env,agent_id):
+    def choose_action(self, state, env,agent_id,epsilon):
 
         # avail_actions_ind = np.nonzero(avail_actions)[0]  # index of actions which can be choose
 
@@ -136,7 +135,7 @@ class QMIX(nn.Module):
         #     inputs = np.hstack((inputs, agent_id))
 
 
-        if np.random.uniform() > EPSILON:
+        if np.random.uniform() > epsilon:
             action=env.action_space.sample()
         else:
             hidden_state = self.eval_hidden[-1:,agent_id, :].reshape(-1,RNN_HIDDEN_STATE)

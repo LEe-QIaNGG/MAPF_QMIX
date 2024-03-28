@@ -6,7 +6,6 @@ from Env import NUM_OBSTACLE,NUM_AGENTS,NUM_DIRECTIONS,OBSERVATION_SIZE
 
 BATCH_SIZE=128    #从缓冲区采样过程的批大小
 LR=0.01           #学习率
-EPSILON=0.9       #epsilon greedy方法
 GAMMA=0.9         #衰减因子
 TARGET_NETWORK_REPLACE_FREQ=100       #目标网络更新的频率
 N_STATES=NUM_AGENTS*(4+2*OBSERVATION_SIZE)   #状态空间大小
@@ -66,13 +65,13 @@ class DQNet(object):
 
         
 
-    def  choose_action(self, x,env):
+    def  choose_action(self, x,env,epsilon):
         #实现epsilon greedy方法，接受当前状态，环境，返回动作
         
         x=torch.unsqueeze(torch.FloatTensor(x), 0).to(device) #为输入状态x增加一个维度
         # x=torch.FloatTensor(x).to(device)
         #只输入一个样本
-        if np.random.uniform() < EPSILON:   # 贪心
+        if np.random.uniform() < epsilon:   # 贪心
             #动作空间中每个动作的Q值，选最大
             actions_value=self.eval_net.forward(x)
             action=torch.max(actions_value, 1)[1].cpu().numpy()

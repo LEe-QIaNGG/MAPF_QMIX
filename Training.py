@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 from utils import NUM_STEP
 MEMORY_CAPACITY=20  #经验回放池大小
+EPSILON=0.9       #epsilon greedy方法
 
 
 def DQN_Training(check_point=False,PATH='./checkpoints/checkpoint_DQN_3agent_3obstacle_8directions_7121.pkl'):
@@ -24,7 +25,7 @@ def DQN_Training(check_point=False,PATH='./checkpoints/checkpoint_DQN_3agent_3ob
         while True:
             env.render()
             if check_point or dqn.memory_counter > MEMORY_CAPACITY:
-                a = dqn.choose_action(s,env)
+                a = dqn.choose_action(s,env,EPSILON)
             else:
                 a=env.action_space.sample()
             s_, r, done, info = env.step(a)
@@ -56,7 +57,7 @@ def DQN_Training(check_point=False,PATH='./checkpoints/checkpoint_DQN_3agent_3ob
     env.close()
 
 
-def QMIX_Training(load_rpm=False,check_point=False,Path=None):
+def QMIX_Training(load_rpm=False,check_point=False,Path='./checkpoints/checkpoint_QMIX_3agent_3obstacle_8directions.pkl'):
     #初始化经验回放池
     e_rpm = utils.EpisodeMemory(num_episode=MEMORY_CAPACITY)
     rpm = utils.ReplayMemory(e_rpm)
@@ -67,7 +68,7 @@ def QMIX_Training(load_rpm=False,check_point=False,Path=None):
         with open("./rpm/e_rpm.pickle", "rb") as file:
             e_rpm = pickle.load(file)
     # ExperienceBuffer={'s':np.zeros((MEMORY_CAPACITY,N_STATES)),'a':np.zeros((MEMORY_CAPACITY,1)),'r':np.zeros((MEMORY_CAPACITY,1)),'s_':np.zeros((MEMORY_CAPACITY,N_STATES))}
-    qmix=QMIX.QMIX()
+    qmix=QMIX.QMIX(check_point,path=Path)
     env = Env.MAPFEnv('DTDE')
     for i_episode in range(400):
         print('episode: ',i_episode,end='\n')
@@ -92,7 +93,7 @@ def QMIX_Training(load_rpm=False,check_point=False,Path=None):
             #收集经验
             action = []
             for i in range(env.num_agent):
-                a=qmix.choose_action(s,env=env,agent_id=i)
+                a=qmix.choose_action(s,env=env,agent_id=i,epsilon=EPSILON)
                 action.append(a)
             s_, r, done, info = env.step(action)
             # print('info；',info)
@@ -116,7 +117,7 @@ def QMIX_Training(load_rpm=False,check_point=False,Path=None):
 
 if __name__== "__main__":
     # DQN_Training(check_point=True)
-    QMIX_Training(load_rpm=True)
+    QMIX_Training(load_rpm=True,check_point=False)
     #绘图表现视野
     #改choose_action()，不会选择已到终点的agent做动作
     #试试加上unsqueeze训练
