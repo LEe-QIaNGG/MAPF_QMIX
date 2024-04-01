@@ -11,13 +11,14 @@ N_ACTIONS=NUM_DIRECTIONS    #动作空间大小
 N_STATES=NUM_AGENTS*(4+2*OBSERVATION_SIZE)   #状态空间大小
 GAMMA=0.9         #衰减因子
 LR=0.01           #学习率
-TARGET_NETWORK_UPDATE_FREQ=100
+TARGET_NETWORK_UPDATE_FREQ=25
 #网络大小参数
 HYPER_HIDDEN_DIM=40
 QMIX_HIDDEN_DIM=40
 RNN_HIDDEN_STATE=40
 INPUT_SHAPE=5+2*OBSERVATION_SIZE    #CETE的state取id号，在加上id
 STATE_SHAPE=INPUT_SHAPE*3
+BATCH_SIZE = 16
 
 device=torch.device('cuda:0')
 
@@ -228,9 +229,9 @@ class QMIX(nn.Module):
     def learn(self,buffer, train_step, epsilon=None):  # train_step表示是第几次学习，用来控制更新target_net网络的参数
         # #初始化rnn
         # self.init_hidden()
-        batch_size=8
 
-        batch_s, batch_action, batch_r, batch_s_,batch_done,sample_index=buffer.sample(batch_size)
+
+        batch_s, batch_action, batch_r, batch_s_,batch_done,sample_index=buffer.sample(BATCH_SIZE)
         # mask = 1 - batch["padded"].float()  # 用来把那些填充的经验的TD-error置0，从而不让它们影响到学习
 
         # 得到每个agent对应的Q值，维度为(episode个数，max_episode_len， n_agents，n_actions)
@@ -243,7 +244,7 @@ class QMIX(nn.Module):
         batch_done = torch.tensor(batch_done, dtype=torch.float32).cuda()
 
         # 取每个agent动作对应的Q值，并且把最后不需要的一维去掉，因为最后一维只有一个值了
-        q_evals = torch.gather(q_evals, dim=3, index=batch_action.reshape(batch_size,NUM_STEP,NUM_AGENTS,1))
+        q_evals = torch.gather(q_evals, dim=3, index=batch_action.reshape(BATCH_SIZE,NUM_STEP,NUM_AGENTS,1))
 
         # 得到target_q
         # q_targets[avail_u_next == 0.0] = - 9999999
@@ -252,14 +253,14 @@ class QMIX(nn.Module):
         q_total_eval = self.eval_mix_net(q_evals, batch_s)
         q_total_target = self.target_mix_net(q_targets, batch_s_)
 
-        targets = batch_r + GAMMA * q_total_target.reshape(batch_size,NUM_STEP)
+        targets = batch_r + GAMMA * q_total_target.reshape(BATCH_SIZE,NUM_STEP)
 
         # td_error = (q_total_eval - targets.detach())
         # masked_td_error = mask * td_error  # 抹掉填充的经验的td_error
 
         # 不能直接用mean，因为还有许多经验是没用的，所以要求和再比真实的经验数，才是真正的均值
         # loss = (masked_td_error ** 2).sum() / mask.sum()
-        loss=self.loss_func(q_total_eval.reshape(batch_size,NUM_STEP), targets.detach())
+        loss=self.loss_func(q_total_eval.reshape(BATCH_SIZE,NUM_STEP), targets.detach())
         self.optimizer.zero_grad()
         loss.backward()
         print('loss: ',loss.item(),end='\n')

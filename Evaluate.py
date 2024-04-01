@@ -3,17 +3,17 @@ import DQN
 import QMIX
 from statistics import mean
 from Env import STEP_LEN
-MAX_STEP=2000
+MAX_STEP=3000
 NUM_EPISODE=50
 
 def evaluate(mode):
     assert mode=='QMIX' or mode=='DQN'
     if mode=='QMIX':
         qmix=QMIX.QMIX(load_checkpoint=True,path='./checkpoints/checkpoint_QMIX_3agent_3obstacle_8directions.pkl')
-        env = Env.MAPFEnv('DTDE')
+        env = Env.MAPFEnv('DTDE',render=True)
     else:
         dqn = DQN.DQNet(MEMORY_CAPACITY=20, load_checkpoint=True, PATH='./checkpoints/checkpoint_DQN_3agent_3obstacle_8directions_7121.pkl')
-        env = Env.MAPFEnv('CTCE')
+        env = Env.MAPFEnv('CTCE',render=True)
 
     # 总指标
     shortcut_rate = []  # 实际走过路径和直线距离的比值
@@ -35,6 +35,7 @@ def evaluate(mode):
 
 
         while done!=True:
+            env.render()
             action = []
             if mode=='QMIX':
                 for i in range(env.num_agent):

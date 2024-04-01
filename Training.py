@@ -9,13 +9,13 @@ import matplotlib.pyplot as plt
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 from utils import NUM_STEP
-MEMORY_CAPACITY=20  #经验回放池大小
+MEMORY_CAPACITY=80  #经验回放池大小
 EPSILON=0.9       #epsilon greedy方法
 
 
-def DQN_Training(check_point=False,PATH='./checkpoints/checkpoint_DQN_3agent_3obstacle_8directions_7121.pkl'):
+def DQN_Training(check_point=False,render=False,PATH='./checkpoints/checkpoint_DQN_3agent_3obstacle_8directions_7121.pkl'):
     dqn= DQN.DQNet(MEMORY_CAPACITY,check_point,PATH)
-    env=Env.MAPFEnv('CTCE')
+    env=Env.MAPFEnv('CTCE',render=render)
 
     print("\nCollecting experience...")
     for i_episode in range(400):
@@ -23,7 +23,8 @@ def DQN_Training(check_point=False,PATH='./checkpoints/checkpoint_DQN_3agent_3ob
         s = env.reset()
         ep_r = 0
         while True:
-            env.render()
+            if render:
+                env.render()
             if check_point or dqn.memory_counter > MEMORY_CAPACITY:
                 a = dqn.choose_action(s,env,EPSILON)
             else:
@@ -54,10 +55,11 @@ def DQN_Training(check_point=False,PATH='./checkpoints/checkpoint_DQN_3agent_3ob
                 break
             #使用下一个状态来更新当前状态
             s = s_
-    env.close()
+    if render:
+        env.close()
 
 
-def QMIX_Training(load_rpm=False,check_point=False,Path='./checkpoints/checkpoint_QMIX_3agent_3obstacle_8directions.pkl'):
+def QMIX_Training(load_rpm=False,render=False,check_point=False,Path='./checkpoints/checkpoint_QMIX_3agent_3obstacle_8directions.pkl'):
     #初始化经验回放池
     e_rpm = utils.EpisodeMemory(num_episode=MEMORY_CAPACITY)
     rpm = utils.ReplayMemory(e_rpm)
@@ -69,7 +71,7 @@ def QMIX_Training(load_rpm=False,check_point=False,Path='./checkpoints/checkpoin
             e_rpm = pickle.load(file)
     # ExperienceBuffer={'s':np.zeros((MEMORY_CAPACITY,N_STATES)),'a':np.zeros((MEMORY_CAPACITY,1)),'r':np.zeros((MEMORY_CAPACITY,1)),'s_':np.zeros((MEMORY_CAPACITY,N_STATES))}
     qmix=QMIX.QMIX(check_point,path=Path)
-    env = Env.MAPFEnv('DTDE')
+    env = Env.MAPFEnv('DTDE',render=render)
     for i_episode in range(400):
         print('episode: ',i_episode,end='\n')
         s=env.reset()
@@ -89,7 +91,8 @@ def QMIX_Training(load_rpm=False,check_point=False,Path='./checkpoints/checkpoin
             qmix.learn(buffer=e_rpm, train_step=i_episode)
 
         for i_step in range(NUM_STEP):
-            # env.render()
+            if render:
+                env.render()
             #收集经验
             action = []
             for i in range(env.num_agent):
@@ -111,13 +114,14 @@ def QMIX_Training(load_rpm=False,check_point=False,Path='./checkpoints/checkpoin
         plt.plot(qmix.loss)
         plt.pause(0.01)  # 暂停0.01秒
         plt.ioff()  # 关闭画图的窗口
-    env.close()
+    if render:
+        env.close()
 
     return
 
 if __name__== "__main__":
-    # DQN_Training(check_point=True)
-    QMIX_Training(load_rpm=True,check_point=False)
+    # DQN_Training(check_point=True,render=True)
+    QMIX_Training(load_rpm=True,render=False,check_point=True )
     #绘图表现视野
     #改choose_action()，不会选择已到终点的agent做动作
     #试试加上unsqueeze训练

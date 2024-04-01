@@ -6,7 +6,7 @@ import time
 from gym.envs.classic_control import rendering
 
 #奖励的参数
-GOAL_REWARD,COLLISION_REWARD,FINISH_REWARD,AWAY_COST,ACTION_COST=2,-3,5,-2,-0.5
+GOAL_REWARD,COLLISION_REWARD,FINISH_REWARD,AWAY_COST,ACTION_COST=2,-3,5,-4,-0.5
 #碰撞的判定距离，智能体的视野距离,智能体的步长
 COLLID_E,OBSERVE_DIST,STEP_LEN,GOAL_E=0.5,2.5,0.1,0.2
 #状态空间 方向矩阵大小
