@@ -12,7 +12,7 @@ def evaluate(mode):
         qmix=QMIX.QMIX(load_checkpoint=True,path='./checkpoints/checkpoint_QMIX_3agent_3obstacle_8directions.pkl')
         env = Env.MAPFEnv('DTDE',render=True)
     else:
-        dqn = DQN.DQNet(MEMORY_CAPACITY=20, load_checkpoint=True, PATH='./checkpoints/checkpoint_DQN_3agent_3obstacle_8directions_7121.pkl')
+        dqn = DQN.DQNet(200, load_checkpoint=True, PATH='./checkpoints/checkpoint_DQN_3agent_3obstacle_8directions_1754.pkl')
         env = Env.MAPFEnv('CTCE',render=True)
 
     # 总指标
@@ -65,4 +65,4 @@ def evaluate(mode):
 #安全性指标
 
 if __name__== "__main__":
-    evaluate('QMIX')
+    evaluate('DQN')

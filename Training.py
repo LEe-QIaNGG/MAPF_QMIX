@@ -14,7 +14,7 @@ EPSILON=0.9       #epsilon greedy方法
 
 
 def DQN_Training(check_point=False,render=False,PATH='./checkpoints/checkpoint_DQN_3agent_3obstacle_8directions_7121.pkl'):
-    dqn= DQN.DQNet(MEMORY_CAPACITY,check_point,PATH)
+    dqn= DQN.DQNet(200,check_point,PATH)
     env=Env.MAPFEnv('CTCE',render=render)
 
     print("\nCollecting experience...")
@@ -120,8 +120,8 @@ def QMIX_Training(load_rpm=False,render=False,check_point=False,Path='./checkpoi
     return
 
 if __name__== "__main__":
-    # DQN_Training(check_point=True,render=True)
-    QMIX_Training(load_rpm=True,render=False,check_point=True )
+    DQN_Training(check_point=True,render=True)
+    # QMIX_Training(load_rpm=True,render=False,check_point=True )
     #绘图表现视野
     #改choose_action()，不会选择已到终点的agent做动作
     #试试加上unsqueeze训练
