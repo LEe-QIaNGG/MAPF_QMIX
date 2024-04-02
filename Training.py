@@ -108,20 +108,21 @@ def QMIX_Training(load_rpm=False,render=False,check_point=False,Path='./checkpoi
 
             if done:
                 break
-        plt.clf()  # 清除上一幅图像
-        plt.xlabel('episode', fontdict={"family": "Times New Roman", "size": 15})
-        plt.ylabel('loss', fontdict={"family": "Times New Roman", "size": 15})
-        plt.plot(qmix.loss)
-        plt.pause(0.01)  # 暂停0.01秒
-        plt.ioff()  # 关闭画图的窗口
+        if render:
+            plt.clf()  # 清除上一幅图像
+            plt.xlabel('episode', fontdict={"family": "Times New Roman", "size": 15})
+            plt.ylabel('loss', fontdict={"family": "Times New Roman", "size": 15})
+            plt.plot(qmix.loss)
+            plt.pause(0.01)  # 暂停0.01秒
+            plt.ioff()  # 关闭画图的窗口
     if render:
         env.close()
 
     return
 
 if __name__== "__main__":
-    DQN_Training(check_point=True,render=True)
-    # QMIX_Training(load_rpm=True,render=False,check_point=True )
+    # DQN_Training(check_point=True,render=False)
+    QMIX_Training(load_rpm=True,render=False,check_point=True )
     #绘图表现视野
     #改choose_action()，不会选择已到终点的agent做动作
     #试试加上unsqueeze训练

@@ -65,4 +65,4 @@ def evaluate(mode):
 #安全性指标
 
 if __name__== "__main__":
-    evaluate('DQN')
+    evaluate('QMIX')
