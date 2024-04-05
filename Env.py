@@ -38,7 +38,16 @@ class State():
 
     def generate_map(self):
         map=np.random.rand(self.num_agent,4)*self.len_edge
-        obstacle=np.random.rand(self.num_obstacle,2)*self.len_edge
+        #防止生成的障碍和终点太近
+        collide=True
+        while collide:
+            obstacle=np.random.rand(self.num_obstacle,2)*self.len_edge
+            for point in map[:,2:4]:
+                mat=point-obstacle
+                min_dist=min(np.sum(mat,axis=1))
+                if min_dist>1:
+                    collide=False
+                    break
         # print(self.map)
         return map,obstacle
 

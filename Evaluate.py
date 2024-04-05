@@ -12,7 +12,7 @@ def evaluate(mode):
         qmix=QMIX.QMIX(load_checkpoint=True,path='./checkpoints/checkpoint_QMIX_3agent_3obstacle_8directions.pkl')
         env = Env.MAPFEnv('DTDE',render=True)
     else:
-        dqn = DQN.DQNet(200, load_checkpoint=True, PATH='./checkpoints/checkpoint_DQN_3agent_3obstacle_8directions_1754.pkl')
+        dqn = DQN.DQNet(200, load_checkpoint=True, PATH='./checkpoints/checkpoint_DQN_3agent_3obstacle_8directions.pkl')
         env = Env.MAPFEnv('CTCE',render=True)
 
     # 总指标
@@ -39,11 +39,13 @@ def evaluate(mode):
             action = []
             if mode=='QMIX':
                 for i in range(env.num_agent):
-                    a=qmix.choose_action(s,env=env,agent_id=i,epsilon=1)
+                    a=qmix.choose_action(s,env=env,agent_id=i,epsilon=0.8)
                     action.append(a)
+                dist_travelled = dist_travelled + len(env.agent_id) * STEP_LEN
             else:
                 action = dqn.choose_action(s, env, epsilon=1)
-            dist_travelled=dist_travelled+len(env.agent_id)*STEP_LEN
+                dist_travelled=dist_travelled+STEP_LEN
+
             s_, r, done, info = env.step(action)
             R=R+r
             # print('info；',info)
@@ -65,4 +67,4 @@ def evaluate(mode):
 #安全性指标
 
 if __name__== "__main__":
-    evaluate('QMIX')
+    evaluate('DQN')

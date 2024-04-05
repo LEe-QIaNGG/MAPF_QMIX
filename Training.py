@@ -13,13 +13,13 @@ MEMORY_CAPACITY=80  #经验回放池大小
 EPSILON=0.9       #epsilon greedy方法
 
 
-def DQN_Training(check_point=False,render=False,PATH='./checkpoints/checkpoint_DQN_3agent_3obstacle_8directions_7121.pkl'):
+def DQN_Training(check_point=False,render=False,PATH='./checkpoints/checkpoint_DQN_3agent_3obstacle_8directions.pkl'):
     dqn= DQN.DQNet(200,check_point,PATH)
     env=Env.MAPFEnv('CTCE',render=render)
 
     print("\nCollecting experience...")
     for i_episode in range(400):
-        
+        dqn.episode = dqn.episode + 1
         s = env.reset()
         ep_r = 0
         while True:
@@ -39,11 +39,11 @@ def DQN_Training(check_point=False,render=False,PATH='./checkpoints/checkpoint_D
             if dqn.memory_counter > MEMORY_CAPACITY:
                 dqn.learn()
                 if done:
-                    print('Ep: ', i_episode, ' |', 'Ep_r: ', round(ep_r, 2))
+                    print('Ep: ', dqn.episode, ' |', 'Ep_r: ', round(ep_r, 2))
 
                 if dqn.learn_step_counter%10000==0:
                     remaining_dist=env.state.get_remaining_dist()
-                    print('Ep: ', i_episode,'step ',dqn.learn_step_counter,'agent_list',
+                    print('Ep: ', dqn.episode,'step ',dqn.learn_step_counter,'agent_list',
                           env.agent_id,'remaining distance',remaining_dist,' Reward ',ep_r,end='\n')
                     # print(env.state.map,'\n',env.state.obstacle)
                     if remaining_dist>200 or dqn.learn_step_counter>40000:
@@ -55,6 +55,7 @@ def DQN_Training(check_point=False,render=False,PATH='./checkpoints/checkpoint_D
                 break
             #使用下一个状态来更新当前状态
             s = s_
+
     if render:
         env.close()
 
@@ -73,6 +74,7 @@ def QMIX_Training(load_rpm=False,render=False,check_point=False,Path='./checkpoi
     qmix=QMIX.QMIX(check_point,path=Path)
     env = Env.MAPFEnv('DTDE',render=render)
     for i_episode in range(400):
+        qmix.episode=qmix.episode+1
         print('episode: ',i_episode,end='\n')
         s=env.reset()
         s=env.add_index(s)
@@ -101,12 +103,16 @@ def QMIX_Training(load_rpm=False,render=False,check_point=False,Path='./checkpoi
             s_, r, done, info = env.step(action)
             # print('info；',info)
             s_=env.add_index(s_)
-            if i_step==499:
+            if i_step==NUM_STEP-1:
                 done=True
-            rpm.append((s, action, r, s_, done),done)   #搜集数据
+            rpm.append((s, action, r, s_, done,0.),done)   #搜集数据   添加的最后一项为padded，标志是否为一局中在规定步数内走完的数据
             s = s_
 
             if done:
+                if done and i_step!=NUM_STEP-1:
+                    print('走完一局')
+                else:
+                    print('超过步数限制')
                 break
         if render:
             plt.clf()  # 清除上一幅图像
@@ -121,7 +127,7 @@ def QMIX_Training(load_rpm=False,render=False,check_point=False,Path='./checkpoi
     return
 
 if __name__== "__main__":
-    # DQN_Training(check_point=True,render=False)
+    # DQN_Training(check_point=True,render=True)
     QMIX_Training(load_rpm=True,render=False,check_point=True )
     #绘图表现视野
     #改choose_action()，不会选择已到终点的agent做动作

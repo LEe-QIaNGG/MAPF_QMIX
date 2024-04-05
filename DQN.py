@@ -7,7 +7,7 @@ from Env import NUM_OBSTACLE,NUM_AGENTS,NUM_DIRECTIONS,OBSERVATION_SIZE
 BATCH_SIZE=128    #从缓冲区采样过程的批大小
 LR=0.01           #学习率
 GAMMA=0.9         #衰减因子
-TARGET_NETWORK_REPLACE_FREQ=100       #目标网络更新的频率
+TARGET_NETWORK_REPLACE_FREQ=2000       #目标网络更新的频率
 N_STATES=NUM_AGENTS*(4+2*OBSERVATION_SIZE)   #状态空间大小
 N_ACTIONS=NUM_DIRECTIONS*NUM_AGENTS    #动作空间大小
 
@@ -43,6 +43,7 @@ class DQNet(object):
         self.MEMORY_CAPACITY=MEMORY_CAPACITY
         self.loss_func=nn.MSELoss().to(device)
         self.learn_step_counter = 0  # 学习次数计数器
+        self.episode=0
 
         #目标网络和训练网络
         self.eval_net, self.target_net=Net().to(device), Net().to(device)
@@ -55,7 +56,7 @@ class DQNet(object):
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             self.memory_counter=checkpoint['memory_counter']
             self.memory=checkpoint['memory']
-
+            self.episode=checkpoint['episode']
         else:
             self.memory_counter=0 #经验回放计数器
             #经验回放池 （s, a, r, s_）
@@ -130,12 +131,13 @@ class DQNet(object):
 
     def save_checkpoint(self,path):
         #保存模型，状态字典
-        path="{}/checkpoint_DQN_{}agent_{}obstacle_{}directions_{}.pkl".format(path,NUM_AGENTS,NUM_OBSTACLE,NUM_DIRECTIONS,self.learn_step_counter)
+        path="{}/checkpoint_DQN_{}agent_{}obstacle_{}directions.pkl".format(path,NUM_AGENTS,NUM_OBSTACLE,NUM_DIRECTIONS)
         torch.save({'eval_state_dict':self.eval_net.state_dict(),
                     'target_state_dict':self.target_net.state_dict(),
                     'optimizer_state_dict':self.optimizer.state_dict(),
                     'memory_counter':self.memory_counter,
-                    'memory':self.memory
+                    'memory':self.memory,
+                    'episode':self.episode
                     },path)
         return
 

@@ -11,7 +11,7 @@ N_ACTIONS=NUM_DIRECTIONS    #动作空间大小
 N_STATES=NUM_AGENTS*(4+2*OBSERVATION_SIZE)   #状态空间大小
 GAMMA=0.9         #衰减因子
 LR=0.01           #学习率
-TARGET_NETWORK_UPDATE_FREQ=25
+TARGET_NETWORK_UPDATE_FREQ=1000
 #网络大小参数
 HYPER_HIDDEN_DIM=40
 QMIX_HIDDEN_DIM=40
@@ -106,6 +106,7 @@ class QMIX(nn.Module):
         self.optimizer=torch.optim.Adam(self.eval_parameters,lr=LR)
         self.loss_func=nn.MSELoss().to(device)
         self.loss = []
+        self.episode=0
         if load_checkpoint:
             checkpoint = torch.load(path)
             self.eval_rnn.load_state_dict(checkpoint['eval_rnn_dict'])
@@ -115,6 +116,7 @@ class QMIX(nn.Module):
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             self.eval_hidden=checkpoint['eval_hidden']
             self.target_hidden=checkpoint['target_hidden']
+            # self.episode = checkpoint['episode']
         else:
             #保存隐藏层参数
             self.eval_hidden=np.zeros((MEMORY_CAPACITY,NUM_AGENTS,RNN_HIDDEN_STATE))
@@ -123,18 +125,7 @@ class QMIX(nn.Module):
 
 
     def choose_action(self, state, env,agent_id,epsilon):
-
-        # avail_actions_ind = np.nonzero(avail_actions)[0]  # index of actions which can be choose
-
-        # # transform agent_num to onehot vector
-        # agent_id = np.zeros(self.n_agents)
-        # agent_id[agent_num] = 1.
-
-        # if self.args.last_action:
-        #     inputs = np.hstack((inputs, last_action))
-        # if self.args.reuse_network:
-        #     inputs = np.hstack((inputs, agent_id))
-
+        #返回数值
 
         if np.random.uniform() > epsilon:
             action=env.action_space.sample()
@@ -191,7 +182,7 @@ class QMIX(nn.Module):
         inputs, inputs_next=[],[]
         for i in sample_index:
             episode=buffer.buffer[i]
-            s,_,_,s_,_=episode[transition_idx][0]
+            s,_,_,s_,_,_=episode[transition_idx][0]
             inputs.append(s)
             inputs_next.append(s)
         return inputs, inputs_next
@@ -231,8 +222,8 @@ class QMIX(nn.Module):
         # self.init_hidden()
 
 
-        batch_s, batch_action, batch_r, batch_s_,batch_done,sample_index=buffer.sample(BATCH_SIZE)
-        # mask = 1 - batch["padded"].float()  # 用来把那些填充的经验的TD-error置0，从而不让它们影响到学习
+        batch_s, batch_action, batch_r, batch_s_,batch_done,padded_batch,sample_index=buffer.sample(BATCH_SIZE)
+        mask = 1 - padded_batch  # 用来把那些填充的经验的TD-error置0，从而不让它们影响到学习
 
         # 得到每个agent对应的Q值，维度为(episode个数，max_episode_len， n_agents，n_actions)
         q_evals, q_targets = self.get_q_values(buffer,sample_index)
@@ -242,6 +233,7 @@ class QMIX(nn.Module):
         batch_r = torch.tensor(batch_r, dtype=torch.float32).cuda()
         batch_s_ = torch.tensor(batch_s_, dtype=torch.float32).cuda()
         batch_done = torch.tensor(batch_done, dtype=torch.float32).cuda()
+        mask=torch.tensor(mask,dtype=torch.float32).cuda()
 
         # 取每个agent动作对应的Q值，并且把最后不需要的一维去掉，因为最后一维只有一个值了
         q_evals = torch.gather(q_evals, dim=3, index=batch_action.reshape(BATCH_SIZE,NUM_STEP,NUM_AGENTS,1))
@@ -253,14 +245,16 @@ class QMIX(nn.Module):
         q_total_eval = self.eval_mix_net(q_evals, batch_s)
         q_total_target = self.target_mix_net(q_targets, batch_s_)
 
-        targets = batch_r + GAMMA * q_total_target.reshape(BATCH_SIZE,NUM_STEP)
+        targets = batch_r + GAMMA * q_total_target.reshape(BATCH_SIZE,NUM_STEP)*(1-batch_done)
 
-        # td_error = (q_total_eval - targets.detach())
-        # masked_td_error = mask * td_error  # 抹掉填充的经验的td_error
+        td_error = (q_total_eval.reshape(BATCH_SIZE,NUM_STEP)- targets.detach())
+        masked_td_error = mask * td_error  # 抹掉填充的经验的td_error
 
         # 不能直接用mean，因为还有许多经验是没用的，所以要求和再比真实的经验数，才是真正的均值
-        # loss = (masked_td_error ** 2).sum() / mask.sum()
-        loss=self.loss_func(q_total_eval.reshape(BATCH_SIZE,NUM_STEP), targets.detach())
+        loss = (masked_td_error ** 2).sum() / mask.sum()
+
+        # loss=self.loss_func(q_total_eval.reshape(BATCH_SIZE,NUM_STEP), targets.detach())
+
         self.optimizer.zero_grad()
         loss.backward()
         print('loss: ',loss.item(),end='\n')
@@ -282,6 +276,7 @@ class QMIX(nn.Module):
                     'target_qmix_dict':self.target_mix_net.state_dict(),
                     'optimizer_state_dict':self.optimizer.state_dict(),
                     'eval_hidden':self.eval_hidden,
-                    'target_hidden':self.target_hidden
+                    'target_hidden':self.target_hidden,
+                    'episode':self.episode
                     },path)
         return
