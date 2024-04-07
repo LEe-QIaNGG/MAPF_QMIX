@@ -44,6 +44,7 @@ class DQNet(object):
         self.loss_func=nn.MSELoss().to(device)
         self.learn_step_counter = 0  # 学习次数计数器
         self.episode=0
+        self.loss=[]
 
         #目标网络和训练网络
         self.eval_net, self.target_net=Net().to(device), Net().to(device)
@@ -121,11 +122,10 @@ class DQNet(object):
 
         q_target=b_r + GAMMA * q_next.max(1)[0].view(BATCH_SIZE, 1) # (batch_size, 1)
         loss=self.loss_func(q_eval, q_target)
-        if self.learn_step_counter%4000==0:
-            print('loss: ',loss)
-        
         self.optimizer.zero_grad() 
         loss.backward()
+        if self.learn_step_counter%200==0:
+            self.loss.append(loss.item())
         self.optimizer.step() 
         return
 

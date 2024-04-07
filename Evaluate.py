@@ -29,7 +29,6 @@ def evaluate(mode):
         total_dist=env.state.get_remaining_dist()     #获取每局游戏刚开始时总路程
         done=False
         i_step=0
-        fail=False    #是否完成
         dist_travelled=0   #统计实际路程
         R=0                #统计奖励
 
@@ -52,7 +51,6 @@ def evaluate(mode):
             if mode=='QMIX':
                 s_=env.add_index(s_)
             if i_step>MAX_STEP:
-                fail=True
                 num_fail=num_fail+1
                 done=True
             s = s_
@@ -62,7 +60,6 @@ def evaluate(mode):
         shortcut_rate.append(dist_travelled/total_dist)
         Reward.append(R)
     print('测试{}局，完成{}局，实际走过路径和直线距离的比值为{}，其均值为{},平均奖励为{}'.format(NUM_EPISODE,NUM_EPISODE-num_fail,shortcut_rate,sum(shortcut_rate)/NUM_EPISODE,sum(Reward)/NUM_EPISODE))
-    print()
 
 #安全性指标
 

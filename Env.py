@@ -37,16 +37,23 @@ class State():
         self.observation=np.concatenate((self.map,self.direction_mat),axis=1)
 
     def generate_map(self):
-        map=np.random.rand(self.num_agent,4)*self.len_edge
+        #防止生成的终点太近
+        goal_collide=True
+        while goal_collide:
+            map=np.random.rand(self.num_agent,4)*self.len_edge
+            dist=pdist(map[:,2:4])
+            if min(dist)>3:
+                goal_collide=False
+
         #防止生成的障碍和终点太近
-        collide=True
-        while collide:
+        obs_collide=True
+        while obs_collide:
             obstacle=np.random.rand(self.num_obstacle,2)*self.len_edge
             for point in map[:,2:4]:
                 mat=point-obstacle
                 min_dist=min(np.sum(mat,axis=1))
-                if min_dist>1:
-                    collide=False
+                if min_dist>2:
+                    obs_collide=False
                     break
         # print(self.map)
         return map,obstacle
@@ -284,7 +291,7 @@ class MAPFEnv(gym.Env):
                 observation = self.state.observe(action[0])
         else:
             # 该智能体已到终点，无需做动作
-            info = [action[0], '智能体已在终点']
+            info = '智能体已在终点'
             observation = self.state.observation
             Reward = ACTION_COST
 

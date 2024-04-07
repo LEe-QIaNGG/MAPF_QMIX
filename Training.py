@@ -9,16 +9,28 @@ import matplotlib.pyplot as plt
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 from utils import NUM_STEP
+from Env import STEP_LEN
+
 MEMORY_CAPACITY=80  #经验回放池大小
 EPSILON=0.9       #epsilon greedy方法
+NUM_EPISODE=200
 
 
 def DQN_Training(check_point=False,render=False,PATH='./checkpoints/checkpoint_DQN_3agent_3obstacle_8directions.pkl'):
     dqn= DQN.DQNet(200,check_point,PATH)
     env=Env.MAPFEnv('CTCE',render=render)
 
+    #测试总指标
+    shortcut_rate = []  # 实际走过路径和直线距离的比值
+    num_fail = 0  # 统计未完成游戏的episode数
+    Reward = []
+
     print("\nCollecting experience...")
-    for i_episode in range(400):
+    for i_episode in range(NUM_EPISODE):
+        # 统计局中变量
+        total_dist=env.state.get_remaining_dist()     #获取每局游戏刚开始时总路程
+        dist_travelled=0   #统计实际路程
+
         dqn.episode = dqn.episode + 1
         s = env.reset()
         ep_r = 0
@@ -29,7 +41,10 @@ def DQN_Training(check_point=False,render=False,PATH='./checkpoints/checkpoint_D
                 a = dqn.choose_action(s,env,EPSILON)
             else:
                 a=env.action_space.sample()
+
             s_, r, done, info = env.step(a)
+            if info!='智能体已在终点':
+                dist_travelled = dist_travelled + STEP_LEN
             
             #保存经验
             dqn.store_transition(s, a, r, s_)
@@ -47,6 +62,7 @@ def DQN_Training(check_point=False,render=False,PATH='./checkpoints/checkpoint_D
                           env.agent_id,'remaining distance',remaining_dist,' Reward ',ep_r,end='\n')
                     # print(env.state.map,'\n',env.state.obstacle)
                     if remaining_dist>200 or dqn.learn_step_counter>40000:
+                        num_fail = num_fail + 1
                         done=True
             if done:
                 dqn.save_checkpoint('./checkpoints')
@@ -55,7 +71,20 @@ def DQN_Training(check_point=False,render=False,PATH='./checkpoints/checkpoint_D
                 break
             #使用下一个状态来更新当前状态
             s = s_
+        if render:
+            plt.clf()  # 清除上一幅图像
+            plt.xlabel('episode', fontdict={"family": "Times New Roman", "size": 15})
+            plt.ylabel('loss', fontdict={"family": "Times New Roman", "size": 15})
+            plt.plot(dqn.loss)
+            plt.pause(0.01)  # 暂停0.01秒
+            plt.ioff()  # 关闭画图的窗口
 
+        shortcut_rate.append(dist_travelled / total_dist)
+        Reward.append(ep_r)
+
+    print('测试{}局，完成{}局，实际走过路径和直线距离的比值均值为{},平均奖励为{}'.format(NUM_EPISODE, NUM_EPISODE - num_fail,
+                                                                sum(shortcut_rate) / NUM_EPISODE,
+                                                                sum(Reward) / NUM_EPISODE))
     if render:
         env.close()
 
@@ -73,12 +102,24 @@ def QMIX_Training(load_rpm=False,render=False,check_point=False,Path='./checkpoi
     # ExperienceBuffer={'s':np.zeros((MEMORY_CAPACITY,N_STATES)),'a':np.zeros((MEMORY_CAPACITY,1)),'r':np.zeros((MEMORY_CAPACITY,1)),'s_':np.zeros((MEMORY_CAPACITY,N_STATES))}
     qmix=QMIX.QMIX(check_point,path=Path)
     env = Env.MAPFEnv('DTDE',render=render)
-    for i_episode in range(400):
+
+    #测试总指标
+    shortcut_rate = []  # 实际走过路径和直线距离的比值
+    num_fail = 0  # 统计未完成游戏的episode数
+    Reward = []
+
+    for i_episode in range(NUM_EPISODE):
+        # 统计局中变量
+        total_dist=env.state.get_remaining_dist()     #获取每局游戏刚开始时总路程
+        dist_travelled=0   #统计实际路程
+        R=0
+
         qmix.episode=qmix.episode+1
         print('episode: ',i_episode,end='\n')
         s=env.reset()
         s=env.add_index(s)
 
+        #保存模型
         if i_episode%10==0 and i_episode!=0:
             qmix.save_checkpoint('./checkpoints')
 
@@ -101,7 +142,12 @@ def QMIX_Training(load_rpm=False,render=False,check_point=False,Path='./checkpoi
                 a=qmix.choose_action(s,env=env,agent_id=i,epsilon=EPSILON)
                 action.append(a)
             s_, r, done, info = env.step(action)
-            # print('info；',info)
+
+            #统计路程
+            novalid=info.count('智能体已在终点')
+            dist_travelled = dist_travelled + (env.num_agent-novalid) * STEP_LEN
+            R=R+r
+
             s_=env.add_index(s_)
             if i_step==NUM_STEP-1:
                 done=True
@@ -112,8 +158,13 @@ def QMIX_Training(load_rpm=False,render=False,check_point=False,Path='./checkpoi
                 if done and i_step!=NUM_STEP-1:
                     print('走完一局')
                 else:
+                    num_fail = num_fail + 1
                     print('超过步数限制')
                 break
+
+        shortcut_rate.append(dist_travelled/total_dist)
+        Reward.append(R)
+
         if render:
             plt.clf()  # 清除上一幅图像
             plt.xlabel('episode', fontdict={"family": "Times New Roman", "size": 15})
@@ -121,6 +172,11 @@ def QMIX_Training(load_rpm=False,render=False,check_point=False,Path='./checkpoi
             plt.plot(qmix.loss)
             plt.pause(0.01)  # 暂停0.01秒
             plt.ioff()  # 关闭画图的窗口
+
+    print('测试{}局，完成{}局，实际走过路径和直线距离的比值均值为{},平均奖励为{}'.format(NUM_EPISODE, NUM_EPISODE - num_fail,
+                                                                sum(shortcut_rate) / NUM_EPISODE,
+                                                                sum(Reward) / NUM_EPISODE))
+
     if render:
         env.close()
 
@@ -131,4 +187,3 @@ if __name__== "__main__":
     QMIX_Training(load_rpm=True,render=False,check_point=True )
     #绘图表现视野
     #改choose_action()，不会选择已到终点的agent做动作
-    #试试加上unsqueeze训练

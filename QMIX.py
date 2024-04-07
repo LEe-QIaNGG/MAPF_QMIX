@@ -11,7 +11,7 @@ N_ACTIONS=NUM_DIRECTIONS    #动作空间大小
 N_STATES=NUM_AGENTS*(4+2*OBSERVATION_SIZE)   #状态空间大小
 GAMMA=0.9         #衰减因子
 LR=0.01           #学习率
-TARGET_NETWORK_UPDATE_FREQ=1000
+TARGET_NETWORK_UPDATE_FREQ=2000
 #网络大小参数
 HYPER_HIDDEN_DIM=40
 QMIX_HIDDEN_DIM=40
@@ -116,7 +116,7 @@ class QMIX(nn.Module):
             self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
             self.eval_hidden=checkpoint['eval_hidden']
             self.target_hidden=checkpoint['target_hidden']
-            # self.episode = checkpoint['episode']
+            self.episode = checkpoint['episode']
         else:
             #保存隐藏层参数
             self.eval_hidden=np.zeros((MEMORY_CAPACITY,NUM_AGENTS,RNN_HIDDEN_STATE))
