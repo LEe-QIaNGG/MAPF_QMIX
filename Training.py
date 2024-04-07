@@ -13,7 +13,7 @@ from Env import STEP_LEN
 
 MEMORY_CAPACITY=80  #经验回放池大小
 EPSILON=0.9       #epsilon greedy方法
-NUM_EPISODE=200
+NUM_EPISODE=100
 
 
 def DQN_Training(check_point=False,render=False,PATH='./checkpoints/checkpoint_DQN_3agent_3obstacle_8directions.pkl'):
@@ -115,7 +115,7 @@ def QMIX_Training(load_rpm=False,render=False,check_point=False,Path='./checkpoi
         R=0
 
         qmix.episode=qmix.episode+1
-        print('episode: ',i_episode,end='\n')
+        print('episode: ',qmix.episode,end='\n')
         s=env.reset()
         s=env.add_index(s)
 
@@ -184,6 +184,6 @@ def QMIX_Training(load_rpm=False,render=False,check_point=False,Path='./checkpoi
 
 if __name__== "__main__":
     # DQN_Training(check_point=True,render=True)
-    QMIX_Training(load_rpm=True,render=False,check_point=True )
+    QMIX_Training(load_rpm=True,render=True,check_point=True )
     #绘图表现视野
     #改choose_action()，不会选择已到终点的agent做动作

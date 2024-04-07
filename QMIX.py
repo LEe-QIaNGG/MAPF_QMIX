@@ -245,7 +245,7 @@ class QMIX(nn.Module):
         q_total_eval = self.eval_mix_net(q_evals, batch_s)
         q_total_target = self.target_mix_net(q_targets, batch_s_)
 
-        targets = batch_r + GAMMA * q_total_target.reshape(BATCH_SIZE,NUM_STEP)*(1-batch_done)
+        targets = batch_r + GAMMA * q_total_target.reshape(BATCH_SIZE,NUM_STEP)#*(1-batch_done)
 
         td_error = (q_total_eval.reshape(BATCH_SIZE,NUM_STEP)- targets.detach())
         masked_td_error = mask * td_error  # 抹掉填充的经验的td_error
