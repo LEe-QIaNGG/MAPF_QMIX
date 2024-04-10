@@ -231,7 +231,7 @@ class MAPFEnv(gym.Env):
                 if done:
                     if id!=n-1:
                         # 填充至形状一样
-                        observation=np.concatenate((observation,np.zeros((NUM_AGENTS-id-1)*(5+2*OBSERVATION_SIZE))))
+                        observation=np.concatenate((observation,np.zeros((NUM_AGENTS-id-1)*(4+2*OBSERVATION_SIZE))))
                     break
 
             return observation.reshape(NUM_AGENTS,-1),Reward,done,Info

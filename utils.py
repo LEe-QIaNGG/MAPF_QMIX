@@ -4,13 +4,12 @@ import numpy as np
 from Env import NUM_AGENTS
 from Env import OBSERVATION_SIZE
 INPUT_SHAPE=5+2*OBSERVATION_SIZE    #CETE的state取id号，在加上id
-NUM_STEP=2000
+NUM_STEP=600               #时间步长
 
 class EpisodeMemory(object):
     def __init__(self,num_episode):
         self.num_episode=num_episode
         self.buffer = collections.deque(maxlen=num_episode)
-        self.num_step=NUM_STEP   #时间步长
 
     def put(self,episode):
         self.buffer.append(episode)
@@ -25,9 +24,10 @@ class EpisodeMemory(object):
 
         for i in index:
             experience=self.buffer[i]
-            idx = np.random.randint(0, len(experience)-self.num_step+1)  #随机选取一个时间步的id
+            idx = np.random.randint(0, len(experience)-NUM_STEP+1)  #随机选取一个时间步的id
             s, a, r, s_p, done,paded = [],[],[],[],[],[]
-            for i in range(idx,idx+self.num_step):
+            range_in_episode=range(idx,idx+NUM_STEP)
+            for i in range_in_episode:
                 e1,e2,e3,e4,e5,e6=experience[i][0]
                 s.append(e1),a.append(e2),r.append(e3),s_p.append(e4),done.append(e5),paded.append(e6)
             obs_batch.append(s)
@@ -46,7 +46,7 @@ class EpisodeMemory(object):
         padded_batch=np.array(padded_batch).astype('float32')
 
         #将列表转换为数组并转换数据类型
-        return obs_batch,action_batch,reward_batch,next_obs_batch,done_batch,padded_batch,index
+        return obs_batch,action_batch,reward_batch,next_obs_batch,done_batch,padded_batch,index,range_in_episode
 
 
 class ReplayMemory(object):

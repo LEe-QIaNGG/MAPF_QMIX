@@ -8,11 +8,11 @@ import utils
 import matplotlib.pyplot as plt
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
-from utils import NUM_STEP
 from Env import STEP_LEN
 
-MEMORY_CAPACITY=80  #经验回放池大小
-EPSILON=0.9       #epsilon greedy方法
+NUM_STEP=3000
+MEMORY_CAPACITY=40  #经验回放池大小
+EPSILON=0.8       #epsilon greedy方法
 NUM_EPISODE=100
 
 
@@ -117,7 +117,7 @@ def QMIX_Training(load_rpm=False,render=False,check_point=False,Path='./checkpoi
         qmix.episode=qmix.episode+1
         print('episode: ',qmix.episode,end='\n')
         s=env.reset()
-        s=env.add_index(s)
+        qmix.init_hidden()
 
         #保存模型
         if i_episode%10==0 and i_episode!=0:
@@ -130,10 +130,10 @@ def QMIX_Training(load_rpm=False,render=False,check_point=False,Path='./checkpoi
             with open("./rpm/e_rpm.pickle", "wb") as file:
                 pickle.dump(e_rpm, file)
 
-        if len(e_rpm.buffer) >= MEMORY_CAPACITY:
-            qmix.learn(buffer=e_rpm, train_step=i_episode)
-
         for i_step in range(NUM_STEP):
+            if len(e_rpm.buffer) >= MEMORY_CAPACITY and i_step%1000==0:
+                qmix.learn(buffer=e_rpm, train_step=i_episode*3+i_step/1000)
+
             if render:
                 env.render()
             #收集经验
@@ -148,7 +148,6 @@ def QMIX_Training(load_rpm=False,render=False,check_point=False,Path='./checkpoi
             dist_travelled = dist_travelled + (env.num_agent-novalid) * STEP_LEN
             R=R+r
 
-            s_=env.add_index(s_)
             if i_step==NUM_STEP-1:
                 done=True
             rpm.append((s, action, r, s_, done,0.),done)   #搜集数据   添加的最后一项为padded，标志是否为一局中在规定步数内走完的数据
