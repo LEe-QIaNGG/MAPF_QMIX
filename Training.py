@@ -1,10 +1,8 @@
-import numpy as np
 import pickle
 import DQN
 import Env
 import os
-import QMIX
-import utils
+from MyQmix import QMIX, utils
 import matplotlib.pyplot as plt
 
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
@@ -100,7 +98,7 @@ def QMIX_Training(load_rpm=False,render=False,check_point=False,Path='./checkpoi
         with open("./rpm/e_rpm.pickle", "rb") as file:
             e_rpm = pickle.load(file)
     # ExperienceBuffer={'s':np.zeros((MEMORY_CAPACITY,N_STATES)),'a':np.zeros((MEMORY_CAPACITY,1)),'r':np.zeros((MEMORY_CAPACITY,1)),'s_':np.zeros((MEMORY_CAPACITY,N_STATES))}
-    qmix=QMIX.QMIX(check_point,path=Path)
+    qmix= QMIX.QMIX(check_point, path=Path)
     env = Env.MAPFEnv('DTDE',render=render)
 
     #测试总指标

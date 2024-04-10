@@ -1,7 +1,6 @@
 import Env
 import DQN
-import QMIX
-from statistics import mean
+from MyQmix import QMIX
 from Env import STEP_LEN
 MAX_STEP=3000
 NUM_EPISODE=50
@@ -9,7 +8,7 @@ NUM_EPISODE=50
 def evaluate(mode):
     assert mode=='QMIX' or mode=='DQN'
     if mode=='QMIX':
-        qmix=QMIX.QMIX(load_checkpoint=True,path='./checkpoints/checkpoint_QMIX_3agent_3obstacle_8directions.pkl')
+        qmix= QMIX.QMIX(load_checkpoint=True, path='./checkpoints/checkpoint_QMIX_3agent_3obstacle_8directions.pkl')
         env = Env.MAPFEnv('DTDE',render=True)
     else:
         dqn = DQN.DQNet(200, load_checkpoint=True, PATH='./checkpoints/checkpoint_DQN_3agent_3obstacle_8directions.pkl')

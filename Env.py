@@ -4,6 +4,7 @@ from gymnasium import spaces
 from scipy.spatial.distance import pdist,squareform
 import time
 from gym.envs.classic_control import rendering
+import argparse
 
 #奖励的参数
 GOAL_REWARD,COLLISION_REWARD,FINISH_REWARD,AWAY_COST,ACTION_COST=2,-3,5,-4,-0.5
@@ -11,7 +12,7 @@ GOAL_REWARD,COLLISION_REWARD,FINISH_REWARD,AWAY_COST,ACTION_COST=2,-3,5,-4,-0.5
 COLLID_E,OBSERVE_DIST,STEP_LEN,GOAL_E=0.5,2.5,0.1,0.2
 #状态空间 方向矩阵大小
 OBSERVATION_SIZE=4
-NUM_OBSTACLE,NUM_AGENTS=3,3 #障碍物个数
+NUM_OBSTACLE,NUM_AGENTS=8,4 #障碍物个数
 MAP_WIDTH=20 #地图为正方形
 SCREEN_WIDTH=400
 DRAW_MUTIPLE=SCREEN_WIDTH/MAP_WIDTH
@@ -48,13 +49,13 @@ class State():
         #防止生成的障碍和终点太近
         obs_collide=True
         while obs_collide:
+            min_dist=[]
             obstacle=np.random.rand(self.num_obstacle,2)*self.len_edge
             for point in map[:,2:4]:
-                mat=point-obstacle
-                min_dist=min(np.sum(mat,axis=1))
-                if min_dist>2:
-                    obs_collide=False
-                    break
+                mat=abs(point-obstacle)
+                min_dist.append(min(np.sum(mat,axis=1)))
+            if min(min_dist)>2:
+                obs_collide=False
         # print(self.map)
         return map,obstacle
 
@@ -182,6 +183,8 @@ class State():
         return sum(np.linalg.norm(mat,ord=2,axis=1))
 
 
+
+
     
 
 
@@ -194,6 +197,7 @@ class MAPFEnv(gym.Env):
         self.len_edge=MAP_WIDTH
         assert mode=='DTDE' or mode=='CTCE'
         self.mode=mode
+        self.flag_render=render
 
 
         #动作空间简化为离散的N个方向，每次只有一个智能体移动
@@ -220,6 +224,7 @@ class MAPFEnv(gym.Env):
             return observation, Reward, done, info
 
         elif self.mode=='DTDE':   #这种情况参数为shape n*1的向量，第二位空间为n direction
+
             n=len(index)
             observation,Reward,Info=[],0,[]
             for id,direction in enumerate(index):
@@ -308,6 +313,84 @@ class MAPFEnv(gym.Env):
         index=np.array(range(NUM_AGENTS)).reshape(NUM_AGENTS,-1)
         state=np.concatenate((index,state),axis=1)
         return state
+
+def qmix_args(args):
+    args.rnn_hidden_dim = 512
+    args.two_hyper_layers = True
+    args.qmix_hidden_dim = 128
+    args.hyper_hidden_dim=256
+    args.lr = 5e-6
+
+    # epsilon greedy
+    args.epsilon = 1
+    args.min_epsilon = 0.1
+    anneal_steps = 50000
+    args.anneal_epsilon = (args.epsilon - args.min_epsilon) / anneal_steps
+    args.epsilon_anneal_scale = 'step'
+
+    # the number of the epoch to train the agent
+    args.n_epoch = 20000
+
+    # the number of the episodes in one epoch
+    args.n_episodes = 10
+
+    # the number of the train steps in one epoch
+    args.train_steps = 1
+
+    # # how often to evaluate
+    args.evaluate_cycle = 25
+
+    # experience replay
+    args.batch_size = 32
+    args.buffer_size = int(5e3)
+
+    # how often to save the model
+    args.save_cycle = 20
+
+    # how often to update the target_net
+    args.target_update_cycle = 20
+
+    # prevent gradient explosion
+    args.grad_norm_clip = 10
+
+    return args
+
+
+def get_common_args():
+    parser = argparse.ArgumentParser()
+
+    # the environment setting
+    parser.add_argument('--obs_space', type=int, default=12, help='observation space')
+    parser.add_argument('--state_space', type=int, default=NUM_AGENTS*12, help='observation space')
+
+    parser.add_argument('--action_space', type=int, default=8, help='action space')
+    parser.add_argument('--num_actions', type=int, default=8, help='number of agents')
+    parser.add_argument('--num_agents', type=int, default=NUM_AGENTS, help='number of agents')
+    parser.add_argument('--max_episode_steps', type=int, default=800, help='number of agents')
+
+    parser.add_argument('--difficulty', type=str, default='7', help='the difficulty of the game')
+    parser.add_argument('--game_version', type=str, default='latest', help='the version of the game')
+    parser.add_argument('--map', type=str, default='3m', help='the map of the game')
+    parser.add_argument('--seed', type=int, default=123, help='random seed')
+    parser.add_argument('--step_mul', type=int, default=8, help='how many steps to make an action')
+    parser.add_argument('--replay_dir', type=str, default='', help='the directory of save the replay')
+
+    parser.add_argument('--alg', type=str, default='qmix', help='the algorithm to train the agent')
+    parser.add_argument('--last_action', type=bool, default=True, help='whether to use the last action to choose action')
+    parser.add_argument('--reuse_network', type=bool, default=True, help='whether to use one network for all agents')
+    parser.add_argument('--gamma', type=float, default=0.9, help='discount factor')
+    parser.add_argument('--optimizer', type=str, default="ADAM", help='optimizer')
+    parser.add_argument('--n_evaluate_episode', type=int, default=5, help='number of the episode to evaluate the agent')
+    parser.add_argument('--model_dir', type=str, default='./model', help='model directory of the policy')
+    parser.add_argument('--result_dir', type=str, default='./result', help='result directory of the policy')
+    parser.add_argument('--load_model', type=bool, default=True, help='whether to load the pretrained model')
+    parser.add_argument('--learn', type=bool, default=True, help='whether to train the model')
+    parser.add_argument('--cuda', type=bool, default=True, help='whether to use the GPU')
+    parser.add_argument('--threshold', type=float, default=19.9, help='threshold to judge whether win')
+    args = parser.parse_args()
+    return args
+
+
 
 if __name__== "__main__":
     env=MAPFEnv()
