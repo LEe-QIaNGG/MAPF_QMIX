@@ -319,7 +319,7 @@ def qmix_args(args):
     args.two_hyper_layers = True
     args.qmix_hidden_dim = 128
     args.hyper_hidden_dim=256
-    args.lr = 5e-6
+    args.lr = 5e-4
 
     # epsilon greedy
     args.epsilon = 1
