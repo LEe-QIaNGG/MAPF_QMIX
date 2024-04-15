@@ -9,14 +9,14 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 from Env import STEP_LEN
 
 NUM_STEP=3000
-MEMORY_CAPACITY=40  #经验回放池大小
+MEMORY_CAPACITY=200  #经验回放池大小
 EPSILON=0.8       #epsilon greedy方法
-NUM_EPISODE=100
+NUM_EPISODE=3000
 
 
-def DQN_Training(check_point=False,render=False,PATH='./checkpoints/checkpoint_DQN_3agent_3obstacle_8directions.pkl'):
+def DQN_Training(check_point=False,render=False,PATH='./checkpoints/checkpoint_DQN_2agent_2obstacle_8directions.pkl'):
     dqn= DQN.DQNet(200,check_point,PATH)
-    env=Env.MAPFEnv('CTCE',render=render)
+    env=Env.MAPFEnv('DTDE',render=render)
 
     #测试总指标
     shortcut_rate = []  # 实际走过路径和直线距离的比值
@@ -30,22 +30,33 @@ def DQN_Training(check_point=False,render=False,PATH='./checkpoints/checkpoint_D
         dist_travelled=0   #统计实际路程
 
         dqn.episode = dqn.episode + 1
-        s = env.reset()
+        if i_episode%300==0:
+            s = env.reset(change_map=True)
+        else:
+            s = env.reset(change_map=False)
         ep_r = 0
         while True:
             if render:
                 env.render()
             if check_point or dqn.memory_counter > MEMORY_CAPACITY:
-                a = dqn.choose_action(s,env,EPSILON)
+                action = []
+                for i in range(env.num_agent):
+                    a = dqn.choose_action(s[i],env,EPSILON)
+                    action.append(a)
             else:
-                a=env.action_space.sample()
+                action = []
+                for i in range(env.num_agent):
+                    a= env.action_space.sample()
+                    action.append(a)
 
-            s_, r, done, info = env.step(a)
+
+            s_, r, done, info = env.step(action)
+            r=r-dqn.learn_step_counter/200
             if info!='智能体已在终点':
                 dist_travelled = dist_travelled + STEP_LEN
             
             #保存经验
-            dqn.store_transition(s, a, r, s_)
+            dqn.store_transition(s, action, r, s_)
             
             ep_r += r
             #经验回放池被填满，DQN开始学习或更新     
@@ -54,16 +65,18 @@ def DQN_Training(check_point=False,render=False,PATH='./checkpoints/checkpoint_D
                 if done:
                     print('Ep: ', dqn.episode, ' |', 'Ep_r: ', round(ep_r, 2))
 
-                if dqn.learn_step_counter%10000==0:
+                if dqn.learn_step_counter%2000==0:
                     remaining_dist=env.state.get_remaining_dist()
                     print('Ep: ', dqn.episode,'step ',dqn.learn_step_counter,'agent_list',
                           env.agent_id,'remaining distance',remaining_dist,' Reward ',ep_r,end='\n')
                     # print(env.state.map,'\n',env.state.obstacle)
-                    if remaining_dist>200 or dqn.learn_step_counter>40000:
+                    if remaining_dist>100 or dqn.learn_step_counter>800:
                         num_fail = num_fail + 1
+                        print('超出步数限制')
                         done=True
             if done:
-                dqn.save_checkpoint('./checkpoints')
+                if i_episode%5==0:
+                    dqn.save_checkpoint('./checkpoints')
                 dqn.learn_step_counter=0
                 #游戏结束，退出while循环
                 break
@@ -180,7 +193,7 @@ def QMIX_Training(load_rpm=False,render=False,check_point=False,Path='./checkpoi
     return
 
 if __name__== "__main__":
-    # DQN_Training(check_point=True,render=True)
-    QMIX_Training(load_rpm=True,render=True,check_point=True )
+    DQN_Training(check_point=True,render=True)
+    # QMIX_Training(load_rpm=True,render=True,check_point=True )
     #绘图表现视野
     #改choose_action()，不会选择已到终点的agent做动作

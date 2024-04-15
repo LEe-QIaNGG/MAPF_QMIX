@@ -7,12 +7,12 @@ from gym.envs.classic_control import rendering
 import argparse
 
 #奖励的参数
-GOAL_REWARD,COLLISION_REWARD,FINISH_REWARD,AWAY_COST,ACTION_COST=2,-3,5,-4,-0.5
+GOAL_REWARD,COLLISION_REWARD,FINISH_REWARD,AWAY_COST,ACTION_COST=50,-3,200,-3,-999
 #碰撞的判定距离，智能体的视野距离,智能体的步长
-COLLID_E,OBSERVE_DIST,STEP_LEN,GOAL_E=0.5,2.5,0.1,0.2
+COLLID_E,OBSERVE_DIST,STEP_LEN,GOAL_E=0.5,2.5,0.1,0.3
 #状态空间 方向矩阵大小
-OBSERVATION_SIZE=4
-NUM_OBSTACLE,NUM_AGENTS=8,4 #障碍物个数
+OBSERVATION_SIZE=1
+NUM_OBSTACLE,NUM_AGENTS=2,2 #障碍物个数
 MAP_WIDTH=20 #地图为正方形
 SCREEN_WIDTH=400
 DRAW_MUTIPLE=SCREEN_WIDTH/MAP_WIDTH
@@ -27,7 +27,7 @@ class State():
 
 
         #起点，终点，障碍
-        self.map,self.obstacle=self.generate_map() #4*num_agent  #num_obstacle*2
+        self.start_pos,self.map,self.obstacle=self.generate_map() #4*num_agent  #num_obstacle*2
         #障碍索引
         self.obstacle_id=np.ones((num_agent,self.num_obstacle))#num_agent*num_obstacle
         #周围的智能体索引，对角线为零
@@ -38,26 +38,30 @@ class State():
         self.observation=np.concatenate((self.map,self.direction_mat),axis=1)
 
     def generate_map(self):
-        #防止生成的终点太近
-        goal_collide=True
-        while goal_collide:
-            map=np.random.rand(self.num_agent,4)*self.len_edge
-            dist=pdist(map[:,2:4])
-            if min(dist)>3:
-                goal_collide=False
+        if NUM_AGENTS==1:
+            map = np.random.rand(self.num_agent, 4) * self.len_edge
+            obstacle = np.random.rand(self.num_obstacle, 2) * self.len_edge
+        else:
+            # 防止生成的终点太近
+            goal_collide = True
+            while goal_collide:
+                map = np.random.rand(self.num_agent, 4) * self.len_edge
+                dist = pdist(map[:, 2:4])
+                if min(dist) > 3:
+                    goal_collide = False
+            # 防止生成的障碍和终点太近
+            obs_collide = True
+            while obs_collide:
+                min_dist = []
+                obstacle = np.random.rand(self.num_obstacle, 2) * self.len_edge
+                for point in map[:, 2:4]:
+                    mat = abs(point - obstacle)
+                    min_dist.append(min(np.sum(mat, axis=1)))
+                if min(min_dist) > 2:
+                    obs_collide = False
+            # print(self.map)
 
-        #防止生成的障碍和终点太近
-        obs_collide=True
-        while obs_collide:
-            min_dist=[]
-            obstacle=np.random.rand(self.num_obstacle,2)*self.len_edge
-            for point in map[:,2:4]:
-                mat=abs(point-obstacle)
-                min_dist.append(min(np.sum(mat,axis=1)))
-            if min(min_dist)>2:
-                obs_collide=False
-        # print(self.map)
-        return map,obstacle
+        return map[:,0:2].copy(),map,obstacle
 
 
     def move_agents(self,action):
@@ -70,6 +74,7 @@ class State():
             cost=0
         else:
             cost=AWAY_COST
+        # cost=AWAY_COST*np.linalg.norm(goal - new_pos, ord=2)
         self.map[action[0],0:2]=new_pos
         return cost
 
@@ -100,15 +105,8 @@ class State():
         #满足距离的
         index=np.argwhere((dist_array<OBSERVE_DIST) & (dist_array>0))
 
-        if len(index)>0 and len(index)<OBSERVATION_SIZE:
-            observe_array=np.pad(pos_tot[index].reshape(-1),(0,(OBSERVATION_SIZE-len(index))*2),'constant',constant_values=(0,0))
-            self.direction_mat[id]=observe_array
-        elif len(index)>OBSERVATION_SIZE:
-            index=np.argpartition(dist_array,OBSERVATION_SIZE)[0:OBSERVATION_SIZE]  #得到前OBSERVATION_SIZE大小近的智能体和障碍索引
-            #在视野范围外的就不算方向了
-
-            self.direction_mat[id]=pos_tot[index].reshape(-1)
-            #更新observation
+        if len(index)>0:
+            self.direction_mat[id]=pos_tot[index[0]]
         else:
             self.direction_mat[id]= np.zeros(OBSERVATION_SIZE*2)
         self.observation = np.concatenate((self.map,self.direction_mat),axis=1)
@@ -162,8 +160,12 @@ class State():
         else:
             return False
     
-    def reset(self):
-        self.map,_=self.generate_map()
+    def reset(self,change_map):
+        if change_map:
+            self.start_pos,self.map,self.obstacle_=self.generate_map()
+
+        else:
+            self.map[:,0:2]=self.start_pos
         self.obstacle_id=np.ones((self.num_agent,self.num_obstacle))
         self.obs_agent = np.ones((self.num_agent, self.num_agent))
         np.fill_diagonal(self.obs_agent, 0)
@@ -242,10 +244,10 @@ class MAPFEnv(gym.Env):
             return observation.reshape(NUM_AGENTS,-1),Reward,done,Info
 
 
-    def reset(self):
+    def reset(self,change_map):
         # self.viewer = rendering.Viewer(SCREEN_WIDTH*3, SCREEN_WIDTH*3)
         self.agent_id=list(range(self.num_agent))
-        self.state.reset()
+        self.state.reset(change_map)
         return self.state.observation
     
     def render(self,mode='human'):
@@ -298,7 +300,10 @@ class MAPFEnv(gym.Env):
             # 该智能体已到终点，无需做动作
             info = '智能体已在终点'
             observation = self.state.observation
-            Reward = ACTION_COST
+            Reward=0
+            if self.mode=='CTCE':
+                dist=self.state.get_remaining_dist()
+                Reward = -dist
 
         if self.agent_id == []:
             Reward = Reward + FINISH_REWARD
@@ -332,7 +337,7 @@ def qmix_args(args):
     args.n_epoch = 20000
 
     # the number of the episodes in one epoch
-    args.n_episodes = 10
+    args.n_episodes = 32
 
     # the number of the train steps in one epoch
     args.train_steps = 1
@@ -341,7 +346,7 @@ def qmix_args(args):
     args.evaluate_cycle = 25
 
     # experience replay
-    args.batch_size = 32
+    args.batch_size = 256
     args.buffer_size = int(5e3)
 
     # how often to save the model
@@ -360,8 +365,8 @@ def get_common_args():
     parser = argparse.ArgumentParser()
 
     # the environment setting
-    parser.add_argument('--obs_space', type=int, default=12, help='observation space')
-    parser.add_argument('--state_space', type=int, default=NUM_AGENTS*12, help='observation space')
+    parser.add_argument('--obs_space', type=int, default=6, help='observation space')
+    parser.add_argument('--state_space', type=int, default=NUM_AGENTS*6, help='observation space')
 
     parser.add_argument('--action_space', type=int, default=8, help='action space')
     parser.add_argument('--num_actions', type=int, default=8, help='number of agents')
@@ -393,7 +398,7 @@ def get_common_args():
 
 
 if __name__== "__main__":
-    env=MAPFEnv()
+    env=MAPFEnv(mode='DTDE',render=True)
     # print(env.action_space.sample())
     # # check_env(env)
     #测试
@@ -403,7 +408,11 @@ if __name__== "__main__":
             print('Epoch', epoch+1, ': ',end='\n')
             # print('remaining distance:',env.state.get_remaining_dist(), end='')
             for i in range(5):
-                _,r,_,_=env.step(env.action_space.sample())     # 随机选择一个动作执行
+                action = []
+                for i in range(env.num_agent):
+                    a= env.action_space.sample()
+                    action.append(a)
+                _,r,_,_=env.step(action)     # 随机选择一个动作执行
                 print('remaining distance:', env.state.get_remaining_dist(),' Reward:',r, end='\n')
                 env.render()    # 刷新画面
                 time.sleep(0.2)

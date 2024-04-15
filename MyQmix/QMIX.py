@@ -5,7 +5,7 @@ import numpy as np
 
 from Training import MEMORY_CAPACITY
 from Env import NUM_OBSTACLE,NUM_AGENTS,NUM_DIRECTIONS,OBSERVATION_SIZE
-from utils import NUM_STEP
+from MyQmix.utils import NUM_STEP
 
 N_ACTIONS=NUM_DIRECTIONS    #动作空间大小
 GAMMA=0.9         #衰减因子

@@ -1,4 +1,3 @@
-from collections import deque
 import os
 os.environ['KMP_DUPLICATE_LIB_OK']='True'
 from Env import *
@@ -17,8 +16,12 @@ buffer = ReplayBuffer(args)
 
 plt.figure()
 plt.axis([0, args.n_epoch, 0, 100])
-success_rates = []
-episode_rewards = []
+if args.load_model:
+    success_rates = np.load('./result/qmix/success_rates_1.npy')
+    episode_rewards = np.load('./result/qmix/episode_rewards_1.npy')
+else:
+    success_rates = []
+    episode_rewards = []
 train_steps = 0
 
 save_path = args.result_dir + '/' + args.alg
@@ -38,7 +41,7 @@ def evaluate():
 for epoch in range(args.n_epoch):
     print('Run {}, train epoch {}'.format(1, epoch))
 
-    if epoch % args.evaluate_cycle == 0:
+    if epoch % args.evaluate_cycle == 0 and epoch >1:
         success_rate, episode_reward = evaluate()
         success_rates.append(success_rate)
         episode_rewards.append(episode_reward)
@@ -88,6 +91,10 @@ plt.subplot(2, 1, 2)
 plt.plot(range(len(episode_rewards)), episode_rewards)
 plt.xlabel('epoch*{}'.format(args.evaluate_cycle))
 plt.ylabel('episode_rewards')
+
+plt.tight_layout()
+plt.subplots_adjust(left=None, bottom=None, right=None, top=None, \
+    wspace=None, hspace=0.45)
 
 plt.savefig(save_path + '/plt_{}.png'.format(1), format='png')
 np.save(save_path + '/success_rates_{}'.format(1), success_rates)
